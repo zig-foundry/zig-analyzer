@@ -24,7 +24,7 @@ test "ast error" {
                 .end = .{ .line = 0, .character = 9 },
             },
             .severity = .Error,
-            .source = "zig_analyzer",
+            .source = "zig-analyzer",
             .message = .{ .string = "expected ';' after declaration" },
         },
     }, .{});
@@ -43,7 +43,7 @@ test "ast-check" {
             },
             .severity = .Error,
             .tags = &.{.Unnecessary},
-            .source = "zig_analyzer",
+            .source = "zig-analyzer",
             .message = .{ .string = "unused local constant" },
         },
     }, .{});
@@ -60,7 +60,7 @@ test "ast-check" {
             },
             .severity = .Error,
             .tags = &.{.Unnecessary},
-            .source = "zig_analyzer",
+            .source = "zig-analyzer",
             .message = .{ .string = "unused local variable" },
         },
     }, .{});
@@ -77,7 +77,7 @@ test "warn style" {
             },
             .code = .{ .string = "dot_slash_import" },
             .severity = .Hint,
-            .source = "zig_analyzer",
+            .source = "zig-analyzer",
             .message = .{ .string = "A ./ is not needed in imports" },
         },
     }, .{ .warn_style = true });
@@ -92,7 +92,7 @@ test "warn style" {
             },
             .code = .{ .string = "bad_style" },
             .severity = .Hint,
-            .source = "zig_analyzer",
+            .source = "zig-analyzer",
             .message = .{ .string = "Functions should be camelCase" },
         },
         .{
@@ -102,7 +102,7 @@ test "warn style" {
             },
             .code = .{ .string = "bad_style" },
             .severity = .Hint,
-            .source = "zig_analyzer",
+            .source = "zig-analyzer",
             .message = .{ .string = "Type functions should be PascalCase" },
         },
     }, .{ .warn_style = true });
@@ -119,7 +119,7 @@ test "highlight global var decls" {
             },
             .code = .{ .string = "highlight_global_var_declarations" },
             .severity = .Hint,
-            .source = "zig_analyzer",
+            .source = "zig-analyzer",
             .message = .{ .string = "Global var declaration" },
         },
     }, .{ .highlight_global_var_declarations = true });
@@ -138,7 +138,7 @@ test "autofix comment" {
                 .end = .{ .line = 2, .character = 11 },
             },
             .severity = .Information,
-            .source = "zig_analyzer",
+            .source = "zig-analyzer",
             .message = .{ .string = "auto discard for unused variable" },
             .relatedInformation = &.{
                 .{
