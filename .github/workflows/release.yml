@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build (${{ matrix.target.name }})
+    runs-on: ${{ matrix.target.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - name: x86_64-linux
+            os: ubuntu-22.04
+            zig_target: x86_64-linux
+            archive: zig-analyzer-x86_64-linux.tar.gz
+          - name: aarch64-linux
+            os: ubuntu-22.04
+            zig_target: aarch64-linux
+            archive: zig-analyzer-aarch64-linux.tar.gz
+          - name: x86_64-macos
+            os: macos-13
+            zig_target: x86_64-macos
+            archive: zig-analyzer-x86_64-macos.tar.gz
+          - name: aarch64-macos
+            os: macos-latest
+            zig_target: aarch64-macos
+            archive: zig-analyzer-aarch64-macos.tar.gz
+          - name: x86_64-windows
+            os: windows-latest
+            zig_target: x86_64-windows
+            archive: zig-analyzer-x86_64-windows.zip
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+
+      - name: Build Binary
+        run: zig build -Doptimize=ReleaseFast -Dtarget=${{ matrix.target.zig_target }}
+
+      - name: Package Binary (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p package
+          cp zig-out/bin/zig_analyzer package/zig-analyzer
+          tar -czvf ${{ matrix.target.archive }} -C package zig-analyzer
+
+      - name: Package Binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path package
+          Copy-Item zig-out/bin/zig_analyzer.exe package/zig-analyzer.exe
+          Compress-Archive -Path package/* -DestinationPath ${{ matrix.target.archive }}
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target.name }}
+          path: ${{ matrix.target.archive }}
+
+  publish-release:
+    name: Publish Release
+    needs: build-release
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'dev' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'Development Build' }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          make_latest: ${{ startsWith(github.ref, 'refs/tags/') && 'true' || 'false' }}
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

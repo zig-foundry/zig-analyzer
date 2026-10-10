@@ -26,7 +26,7 @@ We still respect and follow upstream Zig changes, but development here moves at 
 > `zig-analyzer` targets [Zig master](https://ziglang.org/download/). Make sure your Zig compiler is up to date before building.
 
 ```bash
-git clone --recurse-submodules [https://github.com/zig-foundry/zig-analyzer.git](https://github.com/zig-foundry/zig-analyzer.git)
+git clone --recurse-submodules https://github.com/zig-foundry/zig-analyzer.git
 cd zig-analyzer
 zig build -Doptimize=ReleaseSafe
 

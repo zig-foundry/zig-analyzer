@@ -3,12 +3,12 @@ name: Code Coverage
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
 
 jobs:
   coverage:
-    if: github.repository_owner == 'zigtools'
+    if: github.repository_owner == 'zig-foundry'
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     steps:
