@@ -19,7 +19,7 @@ pub fn addCases(
             .target = target,
             .optimize = optimize,
             .imports = &.{
-                .{ .name = "zls", .module = b.modules.get("zls").? },
+                .{ .name = "zig_analyzer", .module = b.modules.get("zig_analyzer").? },
             },
         }),
     });

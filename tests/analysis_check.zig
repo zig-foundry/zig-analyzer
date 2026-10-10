@@ -3,17 +3,17 @@
 //! See the `./analysis` subdirectory.
 
 const std = @import("std");
-const zls = @import("zls");
+const zig_analyzer = @import("zig_analyzer");
 const builtin = @import("builtin");
 
 const helper = @import("helper.zig");
 const ErrorBuilder = @import("ErrorBuilder.zig");
 
-const InternPool = zls.analyser.InternPool;
+const InternPool = zig_analyzer.analyser.InternPool;
 const Index = InternPool.Index;
 const Key = InternPool.Key;
-const Analyser = zls.Analyser;
-const offsets = zls.offsets;
+const Analyser = zig_analyzer.Analyser;
+const offsets = zig_analyzer.offsets;
 
 pub const std_options: std.Options = .{
     .log_level = .warn,
@@ -91,7 +91,7 @@ pub fn main(init: std.process.Init) Error!void {
     var ip: InternPool = try .init(io, gpa);
     defer ip.deinit(gpa);
 
-    var diagnostics_collection: zls.DiagnosticsCollection = .{
+    var diagnostics_collection: zig_analyzer.DiagnosticsCollection = .{
         .io = io,
         .allocator = gpa,
     };
@@ -99,7 +99,7 @@ pub fn main(init: std.process.Init) Error!void {
 
     var environ_map: std.process.Environ.Map = .init(std.testing.failing_allocator);
 
-    var config: zls.DocumentStore.Config = .{
+    var config: zig_analyzer.DocumentStore.Config = .{
         .environ_map = &environ_map,
         .zig_exe_path = zig_exe_path,
         .zig_lib_dir = zig_lib_dir,
@@ -119,7 +119,7 @@ pub fn main(init: std.process.Init) Error!void {
         config.zig_lib_dir = .{ .handle = zig_lib_dir_fd.dir, .path = "/lib" };
     }
 
-    var document_store: zls.DocumentStore = .{
+    var document_store: zig_analyzer.DocumentStore = .{
         .io = io,
         .allocator = gpa,
         .config = config,
@@ -136,9 +136,9 @@ pub fn main(init: std.process.Init) Error!void {
         std.debug.panic("failed to read from {s}: {}", .{ file_path, err });
     defer gpa.free(source);
 
-    const handle_uri: zls.Uri = try .fromPath(arena, file_path);
+    const handle_uri: zig_analyzer.Uri = try .fromPath(arena, file_path);
     try document_store.openLspSyncedDocument(handle_uri, source);
-    const handle: *zls.DocumentStore.Handle = document_store.getHandle(handle_uri).?;
+    const handle: *zig_analyzer.DocumentStore.Handle = document_store.getHandle(handle_uri).?;
 
     var error_builder: ErrorBuilder = .init(gpa);
     defer error_builder.deinit();
@@ -153,7 +153,7 @@ pub fn main(init: std.process.Init) Error!void {
     };
     defer gpa.free(annotations);
 
-    var analyser = zls.Analyser.init(gpa, arena, &document_store, &ip, handle);
+    var analyser = zig_analyzer.Analyser.init(gpa, arena, &document_store, &ip, handle);
     defer analyser.deinit();
 
     analyser.resolve_number_literal_values = true;

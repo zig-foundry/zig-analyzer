@@ -1,14 +1,14 @@
 const std = @import("std");
-const zls = @import("zls");
+const zig_analyzer = @import("zig_analyzer");
 const builtin = @import("builtin");
 const test_options = @import("test_options");
 
-const types = zls.lsp.types;
+const types = zig_analyzer.lsp.types;
 
 const io = std.testing.io;
 const allocator = std.testing.allocator;
 
-const default_config: zls.configuration.UnresolvedConfig = .{
+const default_config: zig_analyzer.configuration.UnresolvedConfig = .{
     .semantic_tokens = .full,
     .prefer_ast_check_as_child_process = false,
     .inlay_hints_exclude_single_argument = false,
@@ -16,12 +16,12 @@ const default_config: zls.configuration.UnresolvedConfig = .{
 };
 
 pub const Context = struct {
-    server: *zls.Server,
+    server: *zig_analyzer.Server,
     arena: std.heap.ArenaAllocator,
     file_id: u32 = 0,
 
     var cached_config_arena: std.heap.ArenaAllocator = .init(std.heap.page_allocator);
-    var cached_config_manager: ?zls.configuration.Manager = null;
+    var cached_config_manager: ?zig_analyzer.configuration.Manager = null;
 
     pub fn init() !Context {
         if (cached_config_manager == null) {
@@ -41,13 +41,13 @@ pub const Context = struct {
 
             const environ_map = try cached_config_arena.allocator().create(std.process.Environ.Map);
             environ_map.* = .init(std.testing.failing_allocator);
-            var config_manager: zls.configuration.Manager = try .init(io, cached_config_arena.allocator(), environ_map);
+            var config_manager: zig_analyzer.configuration.Manager = try .init(io, cached_config_arena.allocator(), environ_map);
             try config_manager.setConfiguration(.frontend, &config);
             _ = try config_manager.resolveConfiguration(cached_config_arena.allocator());
             cached_config_manager = config_manager;
         }
 
-        const server: *zls.Server = try .create(.{
+        const server: *zig_analyzer.Server = try .create(.{
             .io = io,
             .allocator = allocator,
             .transport = null,
@@ -85,13 +85,13 @@ pub const Context = struct {
         source: []const u8,
         mode: std.zig.Ast.Mode = .zig,
         base_directory: []const u8 = "/",
-    }) !zls.Uri {
+    }) !zig_analyzer.Uri {
         std.debug.assert(std.mem.startsWith(u8, options.base_directory, "/"));
         std.debug.assert(std.mem.endsWith(u8, options.base_directory, "/"));
 
         const arena = self.arena.allocator();
         const path = try std.fmt.allocPrint(arena, "untitled://{s}Untitled-{d}.{t}", .{ options.base_directory, self.file_id, options.mode });
-        const uri: zls.Uri = try .parse(arena, path);
+        const uri: zig_analyzer.Uri = try .parse(arena, path);
 
         const params: types.TextDocument.DidOpenParams = .{
             .textDocument = .{

@@ -1,10 +1,10 @@
 const std = @import("std");
-const zls = @import("zls");
+const zig_analyzer = @import("zig_analyzer");
 
 const Context = @import("../context.zig").Context;
 
-const types = zls.lsp.types;
-const offsets = zls.offsets;
+const types = zig_analyzer.lsp.types;
+const offsets = zig_analyzer.offsets;
 
 const allocator: std.mem.Allocator = std.testing.allocator;
 
@@ -1444,7 +1444,7 @@ fn testHoverWithOptions(
 
     analyser.max_conditional_combos = options.max_conditional_combos;
 
-    const response = try zls.hover.hover(
+    const response = try zig_analyzer.hover.hover(
         &analyser,
         arena,
         handle,
@@ -1460,7 +1460,7 @@ fn testHoverWithOptions(
     const markup_context = response.contents.markup_content;
 
     try std.testing.expectEqual(options.markup_kind, markup_context.kind);
-    try zls.testing.expectEqualStrings(expected, markup_context.value);
+    try zig_analyzer.testing.expectEqualStrings(expected, markup_context.value);
     if (options.highlight) |expected_higlight| {
         const actual_highlight = offsets.rangeToSlice(text, response.range.?, ctx.server.offset_encoding);
         try std.testing.expectEqualStrings(expected_higlight, actual_highlight);

@@ -5,7 +5,7 @@ const zls_version = std.SemanticVersion.parse(@import("build.zig.zon").version) 
 
 const minimum_build_zig_version = @import("build.zig.zon").minimum_zig_version;
 
-/// Specifies the minimum Zig version that is runtime compatible with ZLS
+/// Specifies the minimum Zig version that is runtime compatible with ZigAnalyzer
 const minimum_runtime_zig_version = "0.17.0";
 
 const release_targets = [_]std.Target.Query{
@@ -43,7 +43,7 @@ pub fn build(b: *Build) !void {
 
     const build_options = blk: {
         const build_options = b.addOptions();
-        build_options.step.name = "ZLS build options";
+        build_options.step.name = "ZigAnalyzer build options";
 
         build_options.addOption(std.SemanticVersion, "version", resolved_zls_version);
         build_options.addOption([]const u8, "version_string", b.fmt("{f}", .{resolved_zls_version}));
@@ -53,7 +53,7 @@ pub fn build(b: *Build) !void {
     };
     const exe_options = blk: {
         const exe_options = b.addOptions();
-        exe_options.step.name = "ZLS exe options";
+        exe_options.step.name = "ZigAnalyzer exe options";
 
         exe_options.addOption(bool, "enable_failing_allocator", b.option(bool, "enable-failing-allocator", "Whether to use a randomly failing allocator.") orelse false);
         exe_options.addOption(u32, "enable_failing_allocator_likelihood", b.option(u32, "enable-failing-allocator-likelihood", "The chance that an allocation will fail is `1/likelihood`") orelse 256);
@@ -63,11 +63,11 @@ pub fn build(b: *Build) !void {
     };
     const test_options = blk: {
         const test_options = b.addOptions();
-        test_options.step.name = "ZLS test options";
+        test_options.step.name = "ZigAnalyzer test options";
 
         test_options.addOptionPath("zig_exe_path", .zig_exe);
         test_options.addOptionPathUntracked("zig_lib_path", .zig_lib);
-        test_options.addOptionPathUntracked("global_cache_path", std.Build.LazyPath.cache_root.join(b.allocator, "zls") catch @panic("OOM"));
+        test_options.addOptionPathUntracked("global_cache_path", std.Build.LazyPath.cache_root.join(b.allocator, "zig_analyzer") catch @panic("OOM"));
 
         break :blk test_options.createModule();
     };
@@ -165,12 +165,12 @@ pub fn build(b: *Build) !void {
                     .{ .name = "exe_options", .module = exe_options },
                     .{ .name = "known-folders", .module = known_folders_module },
                     .{ .name = "tracy", .module = zls_release_module.import_table.get("tracy").? },
-                    .{ .name = "zls", .module = zls_release_module },
+                    .{ .name = "zig_analyzer", .module = zls_release_module },
                 },
             });
 
             artifact.* = b.addExecutable(.{
-                .name = "zls",
+                .name = "zig_analyzer",
                 .root_module = exe_module,
                 .max_rss = if (optimize == .debug and target_query.os_tag == .wasi) 2_600_000_000 else 2_000_000_000,
                 .use_llvm = use_llvm,
@@ -188,7 +188,7 @@ pub fn build(b: *Build) !void {
         .build_options = build_options,
         .version_data = version_data_module,
     });
-    b.modules.put(b.allocator, "zls", zls_module) catch @panic("OOM");
+    b.modules.put(b.allocator, "zig_analyzer", zls_module) catch @panic("OOM");
 
     const known_folders_module = b.dependency("known_folders", .{
         .target = target,
@@ -206,13 +206,13 @@ pub fn build(b: *Build) !void {
             .{ .name = "exe_options", .module = exe_options },
             .{ .name = "known-folders", .module = known_folders_module },
             .{ .name = "tracy", .module = zls_module.import_table.get("tracy").? },
-            .{ .name = "zls", .module = zls_module },
+            .{ .name = "zig_analyzer", .module = zls_module },
         },
     });
 
     { // zig build
         const exe = b.addExecutable(.{
-            .name = "zls",
+            .name = "zig_analyzer",
             .root_module = exe_module,
             .use_llvm = use_llvm,
         });
@@ -222,11 +222,11 @@ pub fn build(b: *Build) !void {
 
     { // zig build check
         const exe_check = b.addExecutable(.{
-            .name = "zls",
+            .name = "zig_analyzer",
             .root_module = exe_module,
         });
 
-        const check = b.step("check", "Check if ZLS compiles");
+        const check = b.step("check", "Check if ZigAnalyzer compiles");
         check.dependOn(&exe_check.step);
     }
 
@@ -238,7 +238,7 @@ pub fn build(b: *Build) !void {
             .single_threaded = single_threaded,
             .pic = pie,
             .imports = &.{
-                .{ .name = "zls", .module = zls_module },
+                .{ .name = "zig_analyzer", .module = zls_module },
                 .{ .name = "test_options", .module = test_options },
             },
         }),
@@ -265,7 +265,7 @@ pub fn build(b: *Build) !void {
 
         for ([_]*Build.Step.Run{ run_tests, run_src_tests }) |run| {
             run.setPreopen("/lib", .zig_lib);
-            run.setPreopen("/cache", Build.LazyPath.cache_root.join(b.allocator, "zls") catch @panic("OOM"));
+            run.setPreopen("/cache", Build.LazyPath.cache_root.join(b.allocator, "zig_analyzer") catch @panic("OOM"));
         }
 
         // Setup dependencies of `zig build test`
@@ -361,7 +361,7 @@ fn getVersion(b: *Build) std.SemanticVersion {
     }
 
     if (!std.process.can_spawn) {
-        std.process.fatal("version info cannot be retrieved from git. ZLS version must be provided using -Dversion-string", .{});
+        std.process.fatal("version info cannot be retrieved from git. ZigAnalyzer version must be provided using -Dversion-string", .{});
     }
 
     const root_path = b.fmt("{f}", .{b.root});
@@ -378,10 +378,10 @@ fn getVersion(b: *Build) std.SemanticVersion {
         b.graph.poisonCache();
         const cmd: std.zig.SubprocessCommand = .{ .argv = argv, .cwd = root_path };
         std.log.warn(
-            \\Failed to run 'git describe' to resolve ZLS version: {t}
+            \\Failed to run 'git describe' to resolve ZigAnalyzer version: {t}
             \\command: {f}
             \\
-            \\Consider passing the -Dversion-string flag to specify the ZLS version.
+            \\Consider passing the -Dversion-string flag to specify the ZigAnalyzer version.
         , .{ err, cmd });
         return zls_version;
     };
@@ -390,7 +390,7 @@ fn getVersion(b: *Build) std.SemanticVersion {
         0 => {
             // Tagged release version (e.g. 0.10.0).
             if (!std.mem.eql(u8, git_describe, b.fmt("{f}", .{zls_version}))) {
-                std.process.fatal("ZLS version '{f}' does not match Git tag '{s}'", .{ zls_version, git_describe });
+                std.process.fatal("ZigAnalyzer version '{f}' does not match Git tag '{s}'", .{ zls_version, git_describe });
             }
             return zls_version;
         },
@@ -403,7 +403,7 @@ fn getVersion(b: *Build) std.SemanticVersion {
 
             if (std.SemanticVersion.parse(tagged_ancestor)) |ancestor_ver| {
                 if (zls_version.order(ancestor_ver) != .gt) {
-                    std.process.fatal("ZLS version '{f}' must be greater than tagged ancestor '{f}'", .{ zls_version, ancestor_ver });
+                    std.process.fatal("ZigAnalyzer version '{f}' must be greater than tagged ancestor '{f}'", .{ zls_version, ancestor_ver });
                 }
             } else |_| {
                 // Ignore tagged ancestor if it's not a semantic version.
@@ -453,7 +453,7 @@ fn createZLSModule(
     });
 
     const zls_module = b.createModule(.{
-        .root_source_file = b.path("src/zls.zig"),
+        .root_source_file = b.path("src/zig_analyzer.zig"),
         .target = options.target,
         .optimize = options.optimize,
         .imports = &.{
@@ -524,7 +524,7 @@ fn release(b: *Build, release_artifacts: []const *Build.Step.Compile, released_z
     const release_minisign = b.option(bool, "release-minisign", "Sign release artifacts with Minisign") orelse false;
 
     if (released_zls_version.pre != null and released_zls_version.build == null) {
-        release_step.dependOn(&b.addFail("Cannot build release because the ZLS version could not be resolved").step);
+        release_step.dependOn(&b.addFail("Cannot build release because the ZigAnalyzer version could not be resolved").step);
         return;
     }
 
@@ -654,7 +654,7 @@ const Build = blk: {
 
     if (min_runtime_zig.order(min_build_zig) == .gt) {
         const message = std.fmt.comptimePrint(
-            \\A Zig version that is able to build ZLS must be compatible with ZLS at runtime.
+            \\A Zig version that is able to build ZigAnalyzer must be compatible with ZigAnalyzer at runtime.
             \\
             \\This means that the minimum runtime Zig version must be less or equal to the minimum build Zig version:
             \\  minimum build   Zig version: {[min_build_zig]s}
@@ -665,14 +665,14 @@ const Build = blk: {
         @compileError(message);
     }
 
-    // check that the ZLS version and minimum build version make sense
+    // check that the ZigAnalyzer version and minimum build version make sense
     if (zls_version_is_tagged) {
-        // A different patch version is allowed (e.g ZLS 0.15.0 can require Zig 0.15.1)
+        // A different patch version is allowed (e.g ZigAnalyzer 0.15.0 can require Zig 0.15.1)
 
         if (!min_build_zig_is_tagged or zls_version_simple.order(min_build_zig_simple) != .eq) {
             const message = std.fmt.comptimePrint(
-                \\A tagged release of ZLS should have the same tagged release of Zig as the minimum build requirement:
-                \\          ZLS version: {[current_version]s}
+                \\A tagged release of ZigAnalyzer should have the same tagged release of Zig as the minimum build requirement:
+                \\          ZigAnalyzer version: {[current_version]s}
                 \\  minimum Zig version: {[minimum_version]s}
                 \\
                 \\This is a developer error. Set `minimum_zig_version` in `build.zig.zon` to {[current_version]s}.
@@ -681,8 +681,8 @@ const Build = blk: {
         }
         if (!min_runtime_is_tagged or zls_version_simple.order(min_runtime_zig_simple) != .eq) {
             const message = std.fmt.comptimePrint(
-                \\A tagged release of ZLS should have the same tagged release of Zig as the minimum runtime version:
-                \\          ZLS version: {[current_version]s}
+                \\A tagged release of ZigAnalyzer should have the same tagged release of Zig as the minimum runtime version:
+                \\          ZigAnalyzer version: {[current_version]s}
                 \\  minimum Zig version: {[minimum_version]s}
                 \\
                 \\This is a developer error. Set `minimum_runtime_zig_version` in `build.zig` to `{[current_version]s}`.
@@ -692,9 +692,9 @@ const Build = blk: {
     } else {
         if (!min_build_zig_is_tagged and zls_version_simple.order(min_build_zig_simple) != .eq) {
             const message = std.fmt.comptimePrint(
-                \\A development build of ZLS should have a tagged release of Zig as the minimum build requirement or
+                \\A development build of ZigAnalyzer should have a tagged release of Zig as the minimum build requirement or
                 \\have a development build of Zig as the minimum build requirement with the same major and minor version.
-                \\          ZLS version: {d}.{d}.*
+                \\          ZigAnalyzer version: {d}.{d}.*
                 \\  minimum Zig version: {s}
                 \\
                 \\
@@ -712,7 +712,7 @@ const Build = blk: {
         .lt => true,
         .eq => false,
         .gt => (is_current_zig_tagged_release and !is_min_build_zig_tagged_release) or
-            // a tagged release of ZLS must be build with a tagged release of Zig that has the same major and minor version.
+            // a tagged release of ZigAnalyzer must be build with a tagged release of Zig that has the same major and minor version.
             (zls_version_is_tagged and (min_build_zig_simple.order(current_zig_simple) != .eq)),
     }) {
         const message = std.fmt.comptimePrint(
@@ -724,15 +724,15 @@ const Build = blk: {
         ++ if (is_min_build_zig_tagged_release)
             \\Please download the {[minimum_version]s} release of Zig. (https://ziglang.org/download/)
             \\
-            \\Tagged releases of ZLS are also available.
+            \\Tagged releases of ZigAnalyzer are also available.
             \\  -> https://github.com/zigtools/zls/releases
         else if (is_current_zig_tagged_release)
-            \\Please download or compile a tagged release of ZLS.
+            \\Please download or compile a tagged release of ZigAnalyzer.
             \\  -> https://github.com/zigtools/zls/releases
         else
             \\You can take one of the following actions to resolve this issue:
             \\  - Download the latest nightly of Zig (https://ziglang.org/download/)
-            \\  - Compile an older version of ZLS that is compatible with your Zig version
+            \\  - Compile an older version of ZigAnalyzer that is compatible with your Zig version
         , .{
             .current_version = builtin.zig_version_string,
             .minimum_version = minimum_build_zig_version,

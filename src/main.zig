@@ -1,6 +1,6 @@
 const std = @import("std");
 const zig_builtin = @import("builtin");
-const zls = @import("zls");
+const zls = @import("zig_analyzer");
 const exe_options = @import("exe_options");
 
 const tracy = @import("tracy");
@@ -9,7 +9,7 @@ const known_folders = @import("known-folders");
 const log = std.log.scoped(.main);
 
 const usage =
-    \\ZLS - A non-official language server for Zig
+    \\ZigAnalyzer - A non-official language server for Zig
     \\
     \\Commands:
     \\  help, --help,             Print this help and exit
@@ -128,7 +128,7 @@ fn defaultLogFilePath(
     if (zig_builtin.target.os.tag == .wasi) return null;
     const cache_path = try known_folders.getPath(io, allocator, environ_map, .cache) orelse return null;
     defer allocator.free(cache_path);
-    return try std.Io.Dir.path.join(allocator, &.{ cache_path, "zls", "zls.log" });
+    return try std.Io.Dir.path.join(allocator, &.{ cache_path, "zls", "zig-analyzer.log" });
 }
 
 fn createLogFile(
@@ -167,13 +167,13 @@ const Env = struct {
     /// The ZLS version. Guaranteed to be a [semantic version](https://semver.org/).
     ///
     /// The semantic version can have one of the following formats:
-    /// - `MAJOR.MINOR.PATCH` is a tagged release of ZLS
-    /// - `MAJOR.MINOR.PATCH-dev.COMMIT_HEIGHT+SHORT_COMMIT_HASH` is a development build of ZLS
-    /// - `MAJOR.MINOR.PATCH-dev` is a development build of ZLS where the exact version could not be resolved.
+    /// - `MAJOR.MINOR.PATCH` is a tagged release of ZigAnalyzer
+    /// - `MAJOR.MINOR.PATCH-dev.COMMIT_HEIGHT+SHORT_COMMIT_HASH` is a development build of ZigAnalyzer
+    /// - `MAJOR.MINOR.PATCH-dev` is a development build of ZigAnalyzer where the exact version could not be resolved.
     ///
     version: []const u8,
     global_cache_dir: ?[]const u8,
-    /// Path to a global configuration directory relative to which ZLS configuration files will be searched.
+    /// Path to a global configuration directory relative to which ZigAnalyzer configuration files will be searched.
     /// Not `null` unless [known-folders](https://github.com/ziglibs/known-folders) was unable to find a global configuration directory.
     global_config_dir: ?[]const u8,
     /// Path to a user specific configuration directory relative to which configuration files will be searched.
@@ -182,7 +182,7 @@ const Env = struct {
     /// Path to a `zls.json` config file. Will be resolved by looking in the local configuration directory and then falling back to the global directory.
     /// Can be null if no `zls.json` was found in the global/local config directory.
     config_file: ?[]const u8,
-    /// Path to a `zls.log` file where ZLS will append logging output. The file may be truncated or cleared by ZLS.
+    /// Path to a `zls.log` file where ZigAnalyzer will append logging output. The file may be truncated or cleared by ZigAnalyzer.
     /// Not `null` unless [known-folders](https://github.com/ziglibs/known-folders) was unable to find a cache directory.
     log_file: ?[]const u8,
 };
@@ -353,7 +353,7 @@ fn loadConfigFromSystem(io: std.Io, allocator: std.mem.Allocator, environ_map: *
         const folder_path = try known_folders.getPath(io, allocator, environ_map, folder) orelse continue;
         defer allocator.free(folder_path);
 
-        const config_path = try std.Io.Dir.path.join(allocator, &.{ folder_path, "zls.json" });
+        const config_path = try std.Io.Dir.path.join(allocator, &.{ folder_path, "zig-analyzer.json" });
         defer allocator.free(config_path);
 
         const result = try loadConfigFromFile(io, allocator, config_path);
@@ -502,7 +502,7 @@ fn parseArgs(
     }
 
     if (zig_builtin.target.os.tag != .wasi and try std.Io.File.stdin().isTty(io)) {
-        log.warn("ZLS is not a CLI tool, it communicates over the Language Server Protocol.", .{});
+        log.warn("ZigAnalyzer is not a CLI tool, it communicates over the Language Server Protocol.", .{});
         log.warn("Did you mean to run 'zls --help'?", .{});
         log.warn("", .{});
     }
@@ -573,7 +573,7 @@ pub fn main(init: std.process.Init.Minimal) !u8 {
         log_stderr = true;
     }
 
-    log.info("Starting ZLS      {s} @ '{s}'", .{ zls.build_options.version_string, result.zls_exe_path });
+    log.info("Starting ZigAnalyzer      {s} @ '{s}'", .{ zls.build_options.version_string, result.zls_exe_path });
     if (log_file_path) |path| {
         log.info("Log File:         {s} ({t})", .{ path, log_level });
     } else {

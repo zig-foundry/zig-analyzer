@@ -1,9 +1,9 @@
 const std = @import("std");
-const zls = @import("zls");
+const zig_analyzer = @import("zig_analyzer");
 
 const Context = @import("../context.zig").Context;
 
-const types = zls.lsp.types;
+const types = zig_analyzer.lsp.types;
 
 test "empty" {
     try testFoldingRange("", &.{});
@@ -508,5 +508,5 @@ fn testFoldingRange(source: []const u8, expect: []const types.FoldingRange) !voi
         return error.InvalidResponse;
     };
 
-    try zls.testing.expectEqual(expect, response);
+    try zig_analyzer.testing.expectEqual(expect, response);
 }

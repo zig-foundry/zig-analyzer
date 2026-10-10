@@ -1,12 +1,12 @@
 const std = @import("std");
-const zls = @import("zls");
+const zig_analyzer = @import("zig_analyzer");
 
 const helper = @import("../helper.zig");
 const Context = @import("../context.zig").Context;
 const ErrorBuilder = @import("../ErrorBuilder.zig");
 
-const types = zls.lsp.types;
-const offsets = zls.offsets;
+const types = zig_analyzer.lsp.types;
+const offsets = zig_analyzer.offsets;
 
 const allocator: std.mem.Allocator = std.testing.allocator;
 
@@ -714,7 +714,7 @@ fn testReferences(
         placeholders: std.MultiArrayList(helper.CollectPlaceholdersResult.LocPair),
     };
 
-    var files: zls.Uri.ArrayHashMap(File) = .empty;
+    var files: zig_analyzer.Uri.ArrayHashMap(File) = .empty;
     defer {
         for (files.values()) |*file| {
             allocator.free(file.new_source);
@@ -872,7 +872,7 @@ fn testReferences(
         defer visited.deinit(allocator);
 
         for (actual_locations) |response_location| {
-            const actual_uri: zls.Uri = try .parse(allocator, response_location.uri);
+            const actual_uri: zig_analyzer.Uri = try .parse(allocator, response_location.uri);
             defer actual_uri.deinit(allocator);
 
             const actual_file_index = files.getIndex(actual_uri) orelse {
@@ -915,10 +915,10 @@ fn testReferences(
 }
 
 fn sendRequest(
-    server: *zls.Server,
+    server: *zig_analyzer.Server,
     arena: std.mem.Allocator,
     kind: RequestKind,
-    uri: zls.Uri,
+    uri: zig_analyzer.Uri,
     position: types.Position,
 ) !?[]const types.Location {
     switch (kind) {

@@ -179,7 +179,7 @@ fn collectWarnStyleDiagnostics(
                     .range = offsets.tokenToRange(tree, import_str_token, offset_encoding),
                     .severity = .Hint,
                     .code = .{ .string = "dot_slash_import" },
-                    .source = "zls",
+                    .source = "zig-analyzer",
                     .message = .{ .string = "A ./ is not needed in imports" },
                 });
             }
@@ -210,7 +210,7 @@ fn collectWarnStyleDiagnostics(
                                 .range = offsets.tokenToRange(tree, name_token, offset_encoding),
                                 .severity = .Hint,
                                 .code = .{ .string = "bad_style" },
-                                .source = "zls",
+                                .source = "zig-analyzer",
                                 .message = .{ .string = "Functions should be camelCase" },
                             });
                         } else if (is_type_function and !isPascalCase(func_name)) {
@@ -218,7 +218,7 @@ fn collectWarnStyleDiagnostics(
                                 .range = offsets.tokenToRange(tree, name_token, offset_encoding),
                                 .severity = .Hint,
                                 .code = .{ .string = "bad_style" },
-                                .source = "zls",
+                                .source = "zig-analyzer",
                                 .message = .{ .string = "Type functions should be PascalCase" },
                             });
                         }
@@ -268,7 +268,7 @@ fn collectGlobalVarDiagnostics(
                     .range = offsets.tokenToRange(tree, decl_main_token, offset_encoding),
                     .severity = .Hint,
                     .code = .{ .string = "highlight_global_var_declarations" },
-                    .source = "zls",
+                    .source = "zig-analyzer",
                     .message = .{ .string = "Global var declaration" },
                 });
             },

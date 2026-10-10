@@ -1,10 +1,10 @@
 const std = @import("std");
-const zls = @import("zls");
+const zig_analyzer = @import("zig_analyzer");
 
 const Context = @import("../context.zig").Context;
 
-const types = zls.lsp.types;
-const offsets = zls.offsets;
+const types = zig_analyzer.lsp.types;
+const offsets = zig_analyzer.offsets;
 
 const allocator: std.mem.Allocator = std.testing.allocator;
 

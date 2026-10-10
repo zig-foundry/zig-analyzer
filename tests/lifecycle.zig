@@ -1,6 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const zls = @import("zls");
+const zig_analyzer = @import("zig_analyzer");
 const test_options = @import("test_options");
 
 const io = std.testing.io;
@@ -8,7 +8,7 @@ const allocator = std.testing.allocator;
 
 test "LSP lifecycle" {
     var environ_map: std.process.Environ.Map = .init(std.testing.failing_allocator);
-    var config_manager: zls.configuration.Manager = try .init(io, allocator, &environ_map);
+    var config_manager: zig_analyzer.configuration.Manager = try .init(io, allocator, &environ_map);
     defer config_manager.deinit();
 
     var arena_allocator: std.heap.ArenaAllocator = .init(allocator);
@@ -26,7 +26,7 @@ test "LSP lifecycle" {
         });
     }
 
-    var server: *zls.Server = try .create(.{
+    var server: *zig_analyzer.Server = try .create(.{
         .io = io,
         .allocator = allocator,
         .transport = null,
@@ -34,13 +34,13 @@ test "LSP lifecycle" {
     });
     defer server.destroy();
 
-    try std.testing.expectEqual(zls.Server.Status.uninitialized, server.status);
+    try std.testing.expectEqual(zig_analyzer.Server.Status.uninitialized, server.status);
     _ = try server.sendRequestSync(arena, "initialize", .{ .capabilities = .{} });
-    try std.testing.expectEqual(zls.Server.Status.initializing, server.status);
+    try std.testing.expectEqual(zig_analyzer.Server.Status.initializing, server.status);
     try server.sendNotificationSync(arena, "initialized", .{});
-    try std.testing.expectEqual(zls.Server.Status.initialized, server.status);
+    try std.testing.expectEqual(zig_analyzer.Server.Status.initialized, server.status);
     _ = try server.sendRequestSync(arena, "shutdown", {});
-    try std.testing.expectEqual(zls.Server.Status.shutdown, server.status);
+    try std.testing.expectEqual(zig_analyzer.Server.Status.shutdown, server.status);
     try server.sendNotificationSync(arena, "exit", {});
-    try std.testing.expectEqual(zls.Server.Status.exiting_success, server.status);
+    try std.testing.expectEqual(zig_analyzer.Server.Status.exiting_success, server.status);
 }

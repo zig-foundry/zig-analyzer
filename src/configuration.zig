@@ -719,7 +719,7 @@ fn zigVersionCheck(
     /// If set, a non-tagged zig version cannot be used when `minimum_runtime_zig_version` is a tagged version.
     /// Example: Zig `0.13.0-dev` cannot be used when the minimum Zig version is `0.12.0`.
     ///
-    /// Will be set iff ZLS is a tagged release.
+    /// Will be set iff ZigAnalyzer is a tagged release.
     strict: bool,
 ) bool {
     const minimum_version_is_tagged = minimum_zig_version.pre == null;
@@ -736,7 +736,7 @@ fn zigVersionCheck(
 
     if (strict and !version_is_tagged) {
         std.debug.assert(minimum_version_is_tagged);
-        // A tagged release of ZLS must be used with a tagged release of Zig.
+        // A tagged release of ZigAnalyzer must be used with a tagged release of Zig.
         return false;
     }
 
@@ -768,7 +768,7 @@ test {
     const is_zls_version_tagged = build_options.version.pre == null;
     const min_runtime_zig_version = comptime std.SemanticVersion.parse(build_options.minimum_runtime_zig_version_string) catch unreachable;
 
-    // The build runner must support the Zig version that ZLS is being built with
+    // The build runner must support the Zig version that ZigAnalyzer is being built with
     try std.testing.expect(zigVersionCheck(
         min_runtime_zig_version,
         current_zig_version,
@@ -776,8 +776,8 @@ test {
     ));
 
     if (is_zls_version_tagged) {
-        // A tagged release of ZLS should support the same tagged release of Zig
-        // Example: ZLS 0.12.0 should support Zig 0.12.x -- It is possible that ZLS requires a minimum patch version
+        // A tagged release of ZigAnalyzer should support the same tagged release of Zig
+        // Example: ZigAnalyzer 0.12.0 should support Zig 0.12.x -- It is possible that ZigAnalyzer requires a minimum patch version
         try std.testing.expect(zigVersionCheck(
             .{ .major = current_zig_version.major, .minor = current_zig_version.minor, .patch = 999 },
             min_runtime_zig_version,

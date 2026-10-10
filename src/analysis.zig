@@ -1,4 +1,4 @@
-//! The ZLS analysis backend.
+//! The ZigAnalyzer analysis backend.
 //!
 //! The most frequently used functions are:
 //! - `resolveTypeOfNode`

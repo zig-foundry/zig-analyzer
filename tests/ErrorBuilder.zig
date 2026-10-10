@@ -1,9 +1,9 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const zls = @import("zls");
+const zig_analyzer = @import("zig_analyzer");
 
-const offsets = zls.offsets;
+const offsets = zig_analyzer.offsets;
 
 const ErrorBuilder = @This();
 

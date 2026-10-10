@@ -1,12 +1,12 @@
 const std = @import("std");
-const zls = @import("zls");
+const zig_analyzer = @import("zig_analyzer");
 
 const helper = @import("../helper.zig");
 const Context = @import("../context.zig").Context;
 const ErrorBuilder = @import("../ErrorBuilder.zig");
 
-const types = zls.lsp.types;
-const offsets = zls.offsets;
+const types = zig_analyzer.lsp.types;
+const offsets = zig_analyzer.offsets;
 
 const allocator: std.mem.Allocator = std.testing.allocator;
 
@@ -24,7 +24,7 @@ test "ast error" {
                 .end = .{ .line = 0, .character = 9 },
             },
             .severity = .Error,
-            .source = "zls",
+            .source = "zig_analyzer",
             .message = .{ .string = "expected ';' after declaration" },
         },
     }, .{});
@@ -43,7 +43,7 @@ test "ast-check" {
             },
             .severity = .Error,
             .tags = &.{.Unnecessary},
-            .source = "zls",
+            .source = "zig_analyzer",
             .message = .{ .string = "unused local constant" },
         },
     }, .{});
@@ -60,7 +60,7 @@ test "ast-check" {
             },
             .severity = .Error,
             .tags = &.{.Unnecessary},
-            .source = "zls",
+            .source = "zig_analyzer",
             .message = .{ .string = "unused local variable" },
         },
     }, .{});
@@ -77,7 +77,7 @@ test "warn style" {
             },
             .code = .{ .string = "dot_slash_import" },
             .severity = .Hint,
-            .source = "zls",
+            .source = "zig_analyzer",
             .message = .{ .string = "A ./ is not needed in imports" },
         },
     }, .{ .warn_style = true });
@@ -92,7 +92,7 @@ test "warn style" {
             },
             .code = .{ .string = "bad_style" },
             .severity = .Hint,
-            .source = "zls",
+            .source = "zig_analyzer",
             .message = .{ .string = "Functions should be camelCase" },
         },
         .{
@@ -102,7 +102,7 @@ test "warn style" {
             },
             .code = .{ .string = "bad_style" },
             .severity = .Hint,
-            .source = "zls",
+            .source = "zig_analyzer",
             .message = .{ .string = "Type functions should be PascalCase" },
         },
     }, .{ .warn_style = true });
@@ -119,7 +119,7 @@ test "highlight global var decls" {
             },
             .code = .{ .string = "highlight_global_var_declarations" },
             .severity = .Hint,
-            .source = "zls",
+            .source = "zig_analyzer",
             .message = .{ .string = "Global var declaration" },
         },
     }, .{ .highlight_global_var_declarations = true });
@@ -138,7 +138,7 @@ test "autofix comment" {
                 .end = .{ .line = 2, .character = 11 },
             },
             .severity = .Information,
-            .source = "zls",
+            .source = "zig_analyzer",
             .message = .{ .string = "auto discard for unused variable" },
             .relatedInformation = &.{
                 .{
@@ -176,7 +176,7 @@ fn testDiagnostics(
     context.server.config_manager.config.highlight_global_var_declarations = options.highlight_global_var_declarations;
     context.server.client_capabilities.supports_code_action_fixall = options.autofix;
     context.server.client_capabilities.supports_publish_diagnostics = true;
-    try zls.diagnostics.generateDiagnostics(context.server, context.server.document_store.getHandle(uri).?);
+    try zig_analyzer.diagnostics.generateDiagnostics(context.server, context.server.document_store.getHandle(uri).?);
 
     var actual_diagnostics: std.ArrayList(types.Diagnostic) = .empty;
 
@@ -187,5 +187,5 @@ fn testDiagnostics(
         &actual_diagnostics,
     );
 
-    try zls.testing.expectEqual(expected_diagnostics, actual_diagnostics.items);
+    try zig_analyzer.testing.expectEqual(expected_diagnostics, actual_diagnostics.items);
 }

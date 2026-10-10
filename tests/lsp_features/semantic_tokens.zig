@@ -1,11 +1,11 @@
 const std = @import("std");
-const zls = @import("zls");
+const zig_analyzer = @import("zig_analyzer");
 
 const Context = @import("../context.zig").Context;
 const ErrorBuilder = @import("../ErrorBuilder.zig");
 
-const types = zls.lsp.types;
-const offsets = zls.offsets;
+const types = zig_analyzer.lsp.types;
+const offsets = zig_analyzer.offsets;
 
 const allocator: std.mem.Allocator = std.testing.allocator;
 
@@ -2105,8 +2105,8 @@ test "generic function with @This() as self param" {
 
 const TokenData = struct {
     []const u8,
-    zls.semantic_tokens.TokenType,
-    zls.semantic_tokens.TokenModifiers,
+    zig_analyzer.semantic_tokens.TokenType,
+    zig_analyzer.semantic_tokens.TokenModifiers,
 };
 
 const TokenIterator = struct {
@@ -2116,8 +2116,8 @@ const TokenIterator = struct {
 
     pub const Token = struct {
         loc: offsets.Loc,
-        type: zls.semantic_tokens.TokenType,
-        modifiers: zls.semantic_tokens.TokenModifiers,
+        type: zig_analyzer.semantic_tokens.TokenType,
+        modifiers: zig_analyzer.semantic_tokens.TokenModifiers,
     };
 
     pub fn init(source: []const u8, data: []const u32) TokenIterator {
@@ -2135,8 +2135,8 @@ const TokenIterator = struct {
         const delta_line = token_data[0];
         const delta_start = token_data[1];
         const length = token_data[2];
-        const token_type: zls.semantic_tokens.TokenType = @fromBackingInt(token_data[3]);
-        const token_modifiers: zls.semantic_tokens.TokenModifiers = @bitCast(@as(u16, @intCast(token_data[4])));
+        const token_type: zig_analyzer.semantic_tokens.TokenType = @fromBackingInt(token_data[3]);
+        const token_modifiers: zig_analyzer.semantic_tokens.TokenModifiers = @bitCast(@as(u16, @intCast(token_data[4])));
 
         self.position.line += delta_line;
         self.position.character = delta_start + if (delta_line == 0) self.position.character else 0;

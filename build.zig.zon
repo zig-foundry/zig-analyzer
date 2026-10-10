@@ -1,18 +1,18 @@
 .{
-    .name = .zls,
-    // Remove `-dev` when tagging a new ZLS release and add it back on the next development cycle.
+    .name = .zig_analyzer,
+    // Remove `-dev` when tagging a new ZigAnalyzer release and add it back on the next development cycle.
     .version = "0.17.0-dev",
-    // Specifies the minimum Zig version that is required to compile and test ZLS.
+    // Specifies the minimum Zig version that is required to compile and test ZigAnalyzer.
     // Must be a Zig version that is downloadable from https://ziglang.org/download/ or a mirror.
     //
     // Whenever this version is increased, run the following command:
     // ```bash
     // nix flake update --commit-lock-file
     // ```
-    // If you do not use Nix, a ZLS maintainer can take care of this.
+    // If you do not use Nix, a ZigAnalyzer maintainer can take care of this.
     .minimum_zig_version = "0.17.0",
     // Must be kept in sync with the `deps.nix` for the Nix flake.
-    // If you do not use Nix, a ZLS maintainer can take care of this.
+    // If you do not use Nix, a ZigAnalyzer maintainer can take care of this.
     .dependencies = .{
         .known_folders = .{
             .url = "https://github.com/ziglibs/known-folders/archive/6da0d0c41b78b9ed2d34fa364fcb81b5ebece6c4.tar.gz",
@@ -33,5 +33,5 @@
         },
     },
     .paths = .{""},
-    .fingerprint = 0xa66330b97eb969ae, // Changing this has security and trust implications.
+    .fingerprint = 0xb193caa518ff0a29, // Changing this has security and trust implications.
 }

@@ -1,11 +1,11 @@
 const std = @import("std");
-const zls = @import("zls");
+const zig_analyzer = @import("zig_analyzer");
 
 const Context = @import("../context.zig").Context;
 const ErrorBuilder = @import("../ErrorBuilder.zig");
 
-const types = zls.lsp.types;
-const offsets = zls.offsets;
+const types = zig_analyzer.lsp.types;
+const offsets = zig_analyzer.offsets;
 
 const allocator: std.mem.Allocator = std.testing.allocator;
 
@@ -5111,10 +5111,10 @@ fn testCompletionTextEdit(
     const insert_text_edit: types.TextEdit = .{ .newText = edit.newText, .range = edit.insert };
     const replace_text_edit: types.TextEdit = .{ .newText = edit.newText, .range = edit.replace };
 
-    const actual_insert_text = try zls.diff.applyTextEdits(allocator, text, &.{insert_text_edit}, ctx.server.offset_encoding);
+    const actual_insert_text = try zig_analyzer.diff.applyTextEdits(allocator, text, &.{insert_text_edit}, ctx.server.offset_encoding);
     defer allocator.free(actual_insert_text);
 
-    const actual_replace_text = try zls.diff.applyTextEdits(allocator, text, &.{replace_text_edit}, ctx.server.offset_encoding);
+    const actual_replace_text = try zig_analyzer.diff.applyTextEdits(allocator, text, &.{replace_text_edit}, ctx.server.offset_encoding);
     defer allocator.free(actual_replace_text);
 
     try std.testing.expectEqualStrings(expected_insert_text, actual_insert_text);

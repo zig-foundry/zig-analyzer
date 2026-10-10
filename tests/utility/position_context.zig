@@ -1,11 +1,11 @@
 const std = @import("std");
-const zls = @import("zls");
+const zig_analyzer = @import("zig_analyzer");
 
 const helper = @import("../helper.zig");
 const ErrorBuilder = @import("../ErrorBuilder.zig");
 
-const Analyser = zls.Analyser;
-const offsets = zls.offsets;
+const Analyser = zig_analyzer.Analyser;
+const offsets = zig_analyzer.offsets;
 
 const allocator = std.testing.allocator;
 

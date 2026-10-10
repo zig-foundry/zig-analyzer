@@ -1,51 +1,62 @@
-<img src="https://raw.githubusercontent.com/zigtools/zls/master/.github/assets/zls-opt.svg" alt="ZLS Logo" width=200>
+<img src="https://raw.githubusercontent.com/zigtools/zls/master/.github/assets/zls-opt.svg" alt="zig-analyzer Logo" width=200>
 
-[![CI](https://github.com/zigtools/zls/actions/workflows/main.yml/badge.svg)](https://github.com/zigtools/zls/actions/workflows/main.yml)
-[![codecov](https://codecov.io/github/zigtools/zls/graph/badge.svg?token=WE18MPF00W)](https://codecov.io/github/zigtools/zls)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Discord](https://discord.com/api/guilds/997174129532866701/widget.png?style=shield)](https://discord.gg/5m5U3qpUhk)
 
-ZLS is a non-official implementation of the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) for [Zig](https://ziglang.org/) in Zig. It provides developers with IDE [features](#features) in their editor.
+# zig-analyzer
+
+`zig-analyzer` is an implementation of the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) for [Zig](https://ziglang.org/) written in Zig. It provides developers with IDE features in their editor.
+
+## About This Fork
+
+This project started as a fork of [ZLS](https://github.com/zigtools/zls). We are continuing development independently under the [Zig Foundry](https://github.com/zig-foundry) project to focus on:
+
+- Faster indexing and search speeds
+- Lower memory usage during large builds
+- New editor features and experimental tools
+
+We still respect and follow upstream Zig changes, but development here moves at its own pace.
+
+---
 
 ## Installation
-
-The complete installation guide is available on the [Zigtools website](https://zigtools.org/zls/install/). It covers editor setup, prebuilt binaries and additional documentation.
 
 ### Build From Source
 
 > [!WARNING]
-> ZLS currently lacks critical build system integration with Zig nightly/master. See [#3208](https://github.com/zigtools/zls/issues/3208) for more information.
-> It is recommended to use Zig and ZLS 0.16.0 in the meantime.
-
-The default branch of ZLS targets [Zig master](https://ziglang.org/download/).
+> `zig-analyzer` targets [Zig master](https://ziglang.org/download/). Make sure your Zig compiler is up to date before building.
 
 ```bash
-git clone https://github.com/zigtools/zls
-cd zls
+git clone --recurse-submodules [https://github.com/zig-foundry/zig-analyzer.git](https://github.com/zig-foundry/zig-analyzer.git)
+cd zig-analyzer
 zig build -Doptimize=ReleaseSafe
+
 ```
 
-When upgrading Zig, make sure to update ZLS too keep them in sync.
+The compiled binary will be placed in `zig-out/bin/`.
+
+When upgrading Zig, make sure to update `zig-analyzer` too so both stay in sync.
+
+---
 
 ## Features
 
-ZLS supports most language features, including simple type function support, payload capture type resolution, custom packages, and others. Support for comptime and semantic analysis is Work-in-Progress.
+`zig-analyzer` supports most language features, including simple type function support, payload capture type resolution, custom packages, and others. Support for comptime and semantic analysis is work in progress.
 
-The majority of LSP features are supported:
+Supported LSP features:
 
-- Completions
-- Hover
-- Diagnostics and opt-in [build-on-save](https://zigtools.org/zls/guides/build-on-save/)
-- Go to definition/declaration
-- Workspace symbols and document symbols
-- Find references and rename symbol
-- Formatting based on `zig fmt`
-- Semantic tokens highlighting
-- Inlay hints
-- Code actions
+* Completions
+* Hover
+* Diagnostics and build-on-save
+* Go to definition/declaration
+* Workspace symbols and document symbols
+* Find references and rename symbol
+* Formatting based on `zig fmt`
+* Semantic tokens highlighting
+* Inlay hints
+* Code actions
 
-## Quick Thanks :)
+---
 
-We'd like to take a second to thank all our awesome [contributors](https://github.com/zigtools/zls/graphs/contributors) and donators/backers/sponsors; if you have time or money to spare, consider partaking in either of these options - they help keep ZLS awesome for everyone!
+## Credits & Thanks
 
-[![OpenCollective Backers](https://opencollective.com/zigtools/backers.svg?width=890&limit=1000)](https://opencollective.com/zigtools#category-CONTRIBUTE)
+This project exists thanks to the original work done by the [ZLS contributors](https://github.com/zigtools/zls/graphs/contributors). We thank everyone who built and maintained ZLS over the years.

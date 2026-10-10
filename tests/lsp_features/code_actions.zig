@@ -1,11 +1,11 @@
 const std = @import("std");
-const zls = @import("zls");
+const zig_analyzer = @import("zig_analyzer");
 
 const Context = @import("../context.zig").Context;
 const helper = @import("../helper.zig");
 
-const types = zls.lsp.types;
-const offsets = zls.offsets;
+const types = zig_analyzer.lsp.types;
+const offsets = zig_analyzer.offsets;
 
 const allocator: std.mem.Allocator = std.testing.allocator;
 
@@ -1088,9 +1088,9 @@ fn testDiagnostic(
         try text_edits.appendSlice(allocator, changes.get(uri.raw).?);
     }
 
-    const actual = try zls.diff.applyTextEdits(allocator, source, text_edits.items, ctx.server.offset_encoding);
+    const actual = try zig_analyzer.diff.applyTextEdits(allocator, source, text_edits.items, ctx.server.offset_encoding);
     defer allocator.free(actual);
     try ctx.server.document_store.refreshLspSyncedDocument(uri, try allocator.dupeSentinel(u8, actual, 0));
 
-    try zls.testing.expectEqualStrings(after, handle.tree.source);
+    try zig_analyzer.testing.expectEqualStrings(after, handle.tree.source);
 }

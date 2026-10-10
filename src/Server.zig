@@ -1062,19 +1062,19 @@ pub fn resolveConfiguration(server: *Server) error{ Canceled, OutOfMemory }!void
         if (zig_version_is_tagged) {
             server.showMessage(
                 .Warning,
-                "ZLS '{f}' does not support Zig '{f}'. A ZLS '{}.{}' release should be used instead.",
+                "ZigAnalyzer '{f}' does not support Zig '{f}'. A ZigAnalyzer '{}.{}' release should be used instead.",
                 .{ zls_version, zig_version, zig_version.major, zig_version.minor },
             );
         } else if (zls_version_is_tagged) {
             server.showMessage(
                 .Warning,
-                "ZLS '{f}' should be used with a Zig '{}.{}' release but found Zig '{f}'.",
+                "ZigAnalyzer '{f}' should be used with a Zig '{}.{}' release but found Zig '{f}'.",
                 .{ zls_version, zls_version.major, zls_version.minor, zig_version },
             );
         } else {
             server.showMessage(
                 .Warning,
-                "ZLS '{f}' requires at least Zig '{s}' but got Zig '{f}'. Update Zig to avoid unexpected behavior.",
+                "ZigAnalyzer '{f}' requires at least Zig '{s}' but got Zig '{f}'. Update Zig to avoid unexpected behavior.",
                 .{ zls_version, build_options.minimum_runtime_zig_version_string, zig_version },
             );
         }
@@ -1083,7 +1083,7 @@ pub fn resolveConfiguration(server: *Server) error{ Canceled, OutOfMemory }!void
     if (server.config_manager.config.enable_build_on_save orelse false) {
         if (!BuildOnSaveSupport.isSupportedComptime()) {
             // This message is not very helpful but it relatively uncommon to happen anyway.
-            log.info("'enable_build_on_save' is ignored because build on save is not supported by this ZLS build", .{});
+            log.info("'enable_build_on_save' is ignored because build on save is not supported by this ZigAnalyzer build", .{});
         } else if (server.status == .initialized and (server.config_manager.config.zig_exe_path == null or server.config_manager.zig_lib_dir == null)) {
             log.warn("'enable_build_on_save' is ignored because Zig could not be found", .{});
         } else if (!server.client_capabilities.supports_publish_diagnostics) {
@@ -1345,7 +1345,7 @@ fn isBlockingMessage(msg: Message) bool {
 pub const CreateOptions = struct {
     /// An implementation that doesn't support `concurrent` is permitted but will not be able to provide some features like build on save.
     io: std.Io,
-    /// Must be thread-safe unless the ZLS module is in single_threaded mode or the Io implementation has no parallelism.
+    /// Must be thread-safe unless the ZigAnalyzer module is in single_threaded mode or the Io implementation has no parallelism.
     allocator: std.mem.Allocator,
     /// Must be set when running `loop`. Controls how the server will send and receive messages.
     transport: ?*lsp.Transport,
@@ -1424,7 +1424,7 @@ pub const LoopError = std.mem.Allocator.Error ||
     lsp.BaseProtocolHeader.ParseError ||
     error{ EndOfStream, ParseError };
 
-/// The main loop of ZLS
+/// The main loop of ZigAnalyzer
 pub fn loop(server: *Server) LoopError!void {
     std.debug.assert(server.transport != null);
     defer server.wait_group.cancel(server.io);

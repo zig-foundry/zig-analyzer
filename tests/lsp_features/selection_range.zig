@@ -1,11 +1,11 @@
 const std = @import("std");
-const zls = @import("zls");
+const zig_analyzer = @import("zig_analyzer");
 
 const helper = @import("../helper.zig");
 const Context = @import("../context.zig").Context;
 
-const types = zls.lsp.types;
-const offsets = zls.offsets;
+const types = zig_analyzer.lsp.types;
+const offsets = zig_analyzer.offsets;
 
 const allocator: std.mem.Allocator = std.testing.allocator;
 
@@ -88,6 +88,6 @@ fn testSelectionRange(source: []const u8, expected: []const []const u8) !void {
         it = r.parent;
     }
     const last = actual.pop().?;
-    try zls.testing.expectEqual(expected, actual.items);
+    try zig_analyzer.testing.expectEqual(expected, actual.items);
     try std.testing.expectEqualStrings(phr.new_source, last);
 }
