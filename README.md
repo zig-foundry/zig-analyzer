@@ -22,6 +22,40 @@ We still respect and follow upstream Zig changes, but development here moves at 
 
 ## Installation
 
+### Install Script (recommended)
+
+The `install.sh` script grabs a prebuilt binary or builds from source:
+
+```bash
+curl -sSfL -o install.sh https://raw.githubusercontent.com/zig-foundry/zig-analyzer/main/install.sh
+chmod +x install.sh
+./install.sh
+```
+
+This installs the latest stable binary to `~/.local/bin`. Make sure that directory is in your `PATH`.
+
+Other modes:
+
+```bash
+./install.sh --dev         # latest dev build from main
+./install.sh --local       # build from source in the current directory
+./install.sh --github      # shallow-clone, build, then delete the source
+./install.sh --uninstall   # remove the installed binary
+```
+
+Two more flags work with any mode above:
+
+```bash
+./install.sh --prefix ~/.local/bin --optimize ReleaseSafe
+```
+
+- `--prefix <DIR>` sets the install directory (default: `~/.local/bin`).
+- `--optimize <MODE>` sets the Zig optimize mode for builds: `ReleaseFast` (default), `ReleaseSafe`, or `Debug`.
+
+> **NOTE:**
+> Downloads need `curl` or `wget`.
+> Build modes need `zig` and `git`.
+
 ### Build From Source
 
 > [!WARNING]
