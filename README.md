@@ -1,4 +1,6 @@
-<img src="https://raw.githubusercontent.com/zigtools/zls/master/.github/assets/zls-opt.svg" alt="zig-analyzer Logo" width=200>
+<p align="center">
+  <img src=".github/assets/full_banner.png" alt="zig-analyzer" width="600">
+</p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
