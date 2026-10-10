@@ -1,6 +1,6 @@
 ---
 name: Improvement
-about: Enhance the ZLS experience
+about: Enhance the ZigAnalyzer experience
 labels: enhancement
 ---
 

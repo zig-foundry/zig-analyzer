@@ -75,7 +75,7 @@ zig_lib_path: ?[]const u8 = null,
 /// Specify the path to the Zig executable (not the directory). If unset, zig is looked up in `PATH`. e.g. `/path/to/zig-templeos-armless-1.0.0/zig`.
 zig_exe_path: ?[]const u8 = null,
 
-/// Path to a directory that will be used as zig's cache. Will default to `${KnownFolders.Cache}/zls`.
+/// Path to a directory that will be used as zig's cache. Will default to `${KnownFolders.Cache}/zig-analyzer`.
 global_cache_path: ?[]const u8 = null,
 
 // DO NOT EDIT

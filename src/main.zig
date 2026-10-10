@@ -1,6 +1,6 @@
 const std = @import("std");
 const zig_builtin = @import("builtin");
-const zls = @import("zig_analyzer");
+const zig_analyzer = @import("zig_analyzer");
 const exe_options = @import("exe_options");
 
 const tracy = @import("tracy");
@@ -17,8 +17,8 @@ const usage =
     \\  env                       Print config path, log path and version
     \\
     \\General Options:
-    \\  --config-path [path]      Set path to the 'zls.json' configuration file
-    \\  --log-file [path]         Set path to the 'zls.log' log file
+    \\  --config-path [path]      Set path to the 'zig-analyzer.json' configuration file
+    \\  --log-file [path]         Set path to the 'zig-analyzer.log' log file
     \\  --log-level [enum]        The Log Level to be used.
     \\                              Supported Values:
     \\                                err
@@ -41,7 +41,7 @@ pub const std_options: std.Options = .{
 };
 
 /// Log messages with the LSP 'window/logMessage' message.
-var log_transport: ?*zls.lsp.Transport = null;
+var log_transport: ?*zig_analyzer.lsp.Transport = null;
 /// Log messages to stderr.
 var log_stderr: bool = true;
 /// Log messages to the given file.
@@ -55,20 +55,20 @@ fn logFn(
     args: anytype,
 ) void {
     var buffer: [4096]u8 = undefined;
-    comptime std.debug.assert(buffer.len >= zls.lsp.minimum_logging_buffer_size);
+    comptime std.debug.assert(buffer.len >= zig_analyzer.lsp.minimum_logging_buffer_size);
 
     const io = std.Options.debug_io;
     const prev = io.swapCancelProtection(.blocked);
     defer _ = io.swapCancelProtection(prev);
 
     if (log_transport) |transport| {
-        const lsp_message_type: zls.lsp.types.window.MessageType = switch (level) {
+        const lsp_message_type: zig_analyzer.lsp.types.window.MessageType = switch (level) {
             .err => .Error,
             .warn => .Warning,
             .info => .Info,
             .debug => .Debug,
         };
-        const json_message = zls.lsp.bufPrintLogMessage(&buffer, lsp_message_type, format, args);
+        const json_message = zig_analyzer.lsp.bufPrintLogMessage(&buffer, lsp_message_type, format, args);
         transport.writeJsonMessage(io, json_message) catch |err| switch (err) {
             error.Canceled => unreachable,
             else => {},
@@ -128,7 +128,7 @@ fn defaultLogFilePath(
     if (zig_builtin.target.os.tag == .wasi) return null;
     const cache_path = try known_folders.getPath(io, allocator, environ_map, .cache) orelse return null;
     defer allocator.free(cache_path);
-    return try std.Io.Dir.path.join(allocator, &.{ cache_path, "zls", "zig-analyzer.log" });
+    return try std.Io.Dir.path.join(allocator, &.{ cache_path, "zig-analyzer", "zig-analyzer.log" });
 }
 
 fn createLogFile(
@@ -162,9 +162,9 @@ fn createLogFile(
     return .{ file, log_file_path };
 }
 
-/// Output format of `zls env`
+/// Output format of `zig-analyzer env`
 const Env = struct {
-    /// The ZLS version. Guaranteed to be a [semantic version](https://semver.org/).
+    /// The ZigAnalyzer version. Guaranteed to be a [semantic version](https://semver.org/).
     ///
     /// The semantic version can have one of the following formats:
     /// - `MAJOR.MINOR.PATCH` is a tagged release of ZigAnalyzer
@@ -179,15 +179,15 @@ const Env = struct {
     /// Path to a user specific configuration directory relative to which configuration files will be searched.
     /// Not `null` unless [known-folders](https://github.com/ziglibs/known-folders) was unable to find a local configuration directory.
     local_config_dir: ?[]const u8,
-    /// Path to a `zls.json` config file. Will be resolved by looking in the local configuration directory and then falling back to the global directory.
-    /// Can be null if no `zls.json` was found in the global/local config directory.
+    /// Path to a `zig-analyzer.json` config file. Will be resolved by looking in the local configuration directory and then falling back to the global directory.
+    /// Can be null if no `zig-analyzer.json` was found in the global/local config directory.
     config_file: ?[]const u8,
-    /// Path to a `zls.log` file where ZigAnalyzer will append logging output. The file may be truncated or cleared by ZigAnalyzer.
+    /// Path to a `zig-analyzer.log` file where ZigAnalyzer will append logging output. The file may be truncated or cleared by ZigAnalyzer.
     /// Not `null` unless [known-folders](https://github.com/ziglibs/known-folders) was unable to find a cache directory.
     log_file: ?[]const u8,
 };
 
-fn @"zls env"(
+fn @"zig-analyzer env"(
     io: std.Io,
     allocator: std.mem.Allocator,
     environ_map: *const std.process.Environ.Map,
@@ -197,8 +197,8 @@ fn @"zls env"(
     };
     defer if (global_cache_dir) |path| allocator.free(path);
 
-    const zls_global_cache_dir = if (global_cache_dir) |cache_dir| try std.Io.Dir.path.join(allocator, &.{ cache_dir, "zls" }) else null;
-    defer if (zls_global_cache_dir) |path| allocator.free(path);
+    const zig_analyzer_global_cache_dir = if (global_cache_dir) |cache_dir| try std.Io.Dir.path.join(allocator, &.{ cache_dir, "zig-analyzer" }) else null;
+    defer if (zig_analyzer_global_cache_dir) |path| allocator.free(path);
 
     const global_config_dir = known_folders.getPath(io, allocator, environ_map, .global_configuration) catch |err| switch (err) {
         error.Canceled, error.OutOfMemory => |e| return e,
@@ -233,8 +233,8 @@ fn @"zls env"(
     const writer = &file_writer.interface;
 
     const env: Env = .{
-        .version = zls.build_options.version_string,
-        .global_cache_dir = zls_global_cache_dir,
+        .version = zig_analyzer.build_options.version_string,
+        .global_cache_dir = zig_analyzer_global_cache_dir,
         .global_config_dir = global_config_dir,
         .local_config_dir = local_config_dir,
         .config_file = config_file_path,
@@ -249,7 +249,7 @@ fn @"zls env"(
 
 const LoadConfigResult = union(enum) {
     success: struct {
-        config: zls.Config,
+        config: zig_analyzer.Config,
         config_arena: std.heap.ArenaAllocator.State,
         /// file path of the config.json
         path: []const u8,
@@ -310,7 +310,7 @@ fn loadConfigFromFile(io: std.Io, allocator: std.mem.Allocator, file_path: []con
 
     @setEvalBranchQuota(10000);
     const config = std.json.parseFromTokenSourceLeaky(
-        zls.Config,
+        zig_analyzer.Config,
         arena_allocator.allocator(),
         &scanner,
         parse_options,
@@ -370,7 +370,7 @@ fn loadConfiguration(
     io: std.Io,
     allocator: std.mem.Allocator,
     environ_map: *const std.process.Environ.Map,
-    server: *zls.Server,
+    server: *zig_analyzer.Server,
     maybe_config_path: ?[]const u8,
 ) error{ Canceled, OutOfMemory }!void {
     const tracy_zone = tracy.trace(@src());
@@ -378,7 +378,7 @@ fn loadConfiguration(
 
     var config_arena: std.heap.ArenaAllocator = .init(allocator);
     defer config_arena.deinit();
-    var config: zls.Config = .{};
+    var config: zig_analyzer.Config = .{};
 
     blk: {
         var config_result = if (maybe_config_path) |config_path|
@@ -415,7 +415,7 @@ fn loadConfiguration(
         };
         defer allocator.free(cache_dir_path);
 
-        config.global_cache_path = try std.Io.Dir.path.join(config_arena.allocator(), &.{ cache_dir_path, "zls" });
+        config.global_cache_path = try std.Io.Dir.path.join(config_arena.allocator(), &.{ cache_dir_path, "zig-analyzer" });
     }
 
     try server.config_manager.setConfiguration2(.frontend, &config);
@@ -425,14 +425,14 @@ const ParseArgsResult = struct {
     config_path: ?[]const u8 = null,
     log_level: ?std.log.Level = null,
     log_file_path: ?[]const u8 = null,
-    zls_exe_path: []const u8 = "",
+    zig_analyzer_exe_path: []const u8 = "",
     enable_stderr_logs: bool = false,
     disable_lsp_logs: bool = false,
 
     fn deinit(self: ParseArgsResult, allocator: std.mem.Allocator) void {
         defer if (self.config_path) |path| allocator.free(path);
         defer if (self.log_file_path) |path| allocator.free(path);
-        defer allocator.free(self.zls_exe_path);
+        defer allocator.free(self.zig_analyzer_exe_path);
     }
 };
 
@@ -450,8 +450,8 @@ fn parseArgs(
     var args_it = try args.iterateAllocator(allocator);
     defer args_it.deinit();
 
-    const zls_exe_path = args_it.next() orelse "";
-    result.zls_exe_path = try allocator.dupe(u8, zls_exe_path);
+    const zig_analyzer_exe_path = args_it.next() orelse "";
+    result.zig_analyzer_exe_path = try allocator.dupe(u8, zig_analyzer_exe_path);
 
     var arg_index: usize = 0;
     while (args_it.next()) |arg| : (arg_index += 1) {
@@ -462,10 +462,10 @@ fn parseArgs(
             try std.Io.File.stderr().writeStreamingAll(io, usage);
             std.process.exit(0);
         } else if ((arg_index == 0 and std.mem.eql(u8, arg, "version")) or std.mem.eql(u8, arg, "--version")) {
-            try std.Io.File.stdout().writeStreamingAll(io, zls.build_options.version_string ++ "\n");
+            try std.Io.File.stdout().writeStreamingAll(io, zig_analyzer.build_options.version_string ++ "\n");
             std.process.exit(0);
         } else if (arg_index == 0 and std.mem.eql(u8, arg, "env")) {
-            try @"zls env"(io, allocator, environ_map);
+            try @"zig-analyzer env"(io, allocator, environ_map);
         }
 
         if (std.mem.eql(u8, arg, "--config-path")) { // --config-path
@@ -503,7 +503,7 @@ fn parseArgs(
 
     if (zig_builtin.target.os.tag != .wasi and try std.Io.File.stdin().isTty(io)) {
         log.warn("ZigAnalyzer is not a CLI tool, it communicates over the Language Server Protocol.", .{});
-        log.warn("Did you mean to run 'zls --help'?", .{});
+        log.warn("Did you mean to run 'zig-analyzer --help'?", .{});
         log.warn("", .{});
     }
 
@@ -532,7 +532,7 @@ pub fn main(init: std.process.Init.Minimal) !u8 {
     var tracy_state = if (tracy.enable_allocation) tracy.tracyAllocator(base_allocator) else {};
     const inner_allocator: std.mem.Allocator = if (tracy.enable_allocation) tracy_state.allocator() else base_allocator;
 
-    var failing_allocator_state = if (exe_options.enable_failing_allocator) zls.testing.FailingAllocator.init(inner_allocator, exe_options.enable_failing_allocator_likelihood) else {};
+    var failing_allocator_state = if (exe_options.enable_failing_allocator) zig_analyzer.testing.FailingAllocator.init(inner_allocator, exe_options.enable_failing_allocator_likelihood) else {};
     const allocator: std.mem.Allocator = if (exe_options.enable_failing_allocator) failing_allocator_state.allocator() else inner_allocator;
 
     var threaded: std.Io.Threaded = .init(allocator, .{
@@ -556,14 +556,14 @@ pub fn main(init: std.process.Init.Minimal) !u8 {
     };
 
     var read_buffer: [256]u8 = undefined;
-    var stdio_transport: zls.lsp.Transport.Stdio = .init(&read_buffer, .stdin(), .stdout());
+    var stdio_transport: zig_analyzer.lsp.Transport.Stdio = .init(&read_buffer, .stdin(), .stdout());
 
-    var thread_safe_transport: zls.lsp.ThreadSafeTransport(.{
+    var thread_safe_transport: zig_analyzer.lsp.ThreadSafeTransport(.{
         .thread_safe_read = false,
         .thread_safe_write = true,
     }) = .init(&stdio_transport.transport);
 
-    const transport: *zls.lsp.Transport = &thread_safe_transport.transport;
+    const transport: *zig_analyzer.lsp.Transport = &thread_safe_transport.transport;
 
     log_transport = if (result.disable_lsp_logs) null else transport;
     log_stderr = result.enable_stderr_logs;
@@ -573,17 +573,17 @@ pub fn main(init: std.process.Init.Minimal) !u8 {
         log_stderr = true;
     }
 
-    log.info("Starting ZigAnalyzer      {s} @ '{s}'", .{ zls.build_options.version_string, result.zls_exe_path });
+    log.info("Starting ZigAnalyzer      {s} @ '{s}'", .{ zig_analyzer.build_options.version_string, result.zig_analyzer_exe_path });
     if (log_file_path) |path| {
         log.info("Log File:         {s} ({t})", .{ path, log_level });
     } else {
         log.info("Log File:         none", .{});
     }
 
-    var config_manager: zls.configuration.Manager = try .init(io, allocator, &environ_map);
+    var config_manager: zig_analyzer.configuration.Manager = try .init(io, allocator, &environ_map);
     defer config_manager.deinit();
 
-    const server: *zls.Server = try .create(.{
+    const server: *zig_analyzer.Server = try .create(.{
         .io = io,
         .allocator = allocator,
         .transport = transport,

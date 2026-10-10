@@ -243,22 +243,22 @@ fn generateVSCodeConfigFile(
         configuration.map.deinit(allocator);
     }
 
-    configuration.map.putAssumeCapacityNoClobber("zig.zls.debugLog", .{
+    configuration.map.putAssumeCapacityNoClobber("zig.zig-analyzer.debugLog", .{
         .scope = "resource",
         .type = "boolean",
         .description = "Enable debug logging in release builds of ZigAnalyzer.",
     });
-    configuration.map.putAssumeCapacityNoClobber("zig.zls.trace.server", .{
+    configuration.map.putAssumeCapacityNoClobber("zig.zig-analyzer.trace.server", .{
         .scope = "window",
         .type = "string",
         .@"enum" = &.{ "off", "messages", "verbose" },
         .description = "Traces the communication between VS Code and the language server.",
         .default = .{ .string = "off" },
     });
-    configuration.map.putAssumeCapacityNoClobber("zig.zls.path", .{
+    configuration.map.putAssumeCapacityNoClobber("zig.zig-analyzer.path", .{
         .scope = "machine-overridable",
         .type = "string",
-        .description = "Path to `zls` executable. Example: `C:/zls/zig-cache/bin/zls.exe`. The string \"zls\" means lookup ZigAnalyzer in PATH.",
+        .description = "Path to `zig-analyzer` executable. Example: `C:/zig-analyzer/bin/zig_analyzer.exe`. The string \"zig-analyzer\" means lookup ZigAnalyzer in PATH.",
         .format = "path",
     });
 
@@ -266,7 +266,7 @@ fn generateVSCodeConfigFile(
         if (std.mem.eql(u8, option.name, "zig_exe_path")) continue; // vscode-zig has its own option for this
         if (std.mem.eql(u8, option.name, "force_autofix")) continue; // VS Code supports code actions on save without a workaround
 
-        const snake_case_name = try std.fmt.allocPrint(allocator, "zig.zls.{s}", .{option.name});
+        const snake_case_name = try std.fmt.allocPrint(allocator, "zig.zig-analyzer.{s}", .{option.name});
         defer allocator.free(snake_case_name);
         const name = try snakeCaseToCamelCase(allocator, snake_case_name);
         errdefer allocator.free(name);
@@ -1015,7 +1015,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
                 \\
                 \\Commands:
                 \\  --help                           Prints this message
-                \\  --generate-vscode-config [path]  Output zls-vscode configurations
+                \\  --generate-vscode-config [path]  Output zig-analyzer-vscode configurations
                 \\  --generate-config [path]         Output path to config file (see src/Config.zig)
                 \\  --generate-schema [path]         Output json schema file (see schema.json)
                 \\  --generate-version-data [path]   Output data file

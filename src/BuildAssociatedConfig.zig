@@ -1,4 +1,4 @@
-//! Type definition for the per-project `zls.build.json` configuration file.
+//! Type definition for the per-project `zig-analyzer.build.json` configuration file.
 
 const std = @import("std");
 

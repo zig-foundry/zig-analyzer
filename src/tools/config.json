@@ -133,7 +133,7 @@
         },
         {
             "name": "global_cache_path",
-            "description": "Path to a directory that will be used as zig's cache. Will default to `${KnownFolders.Cache}/zls`.",
+            "description": "Path to a directory that will be used as zig's cache. Will default to `${KnownFolders.Cache}/zig-analyzer`.",
             "type": "?[]const u8",
             "default": null
         }

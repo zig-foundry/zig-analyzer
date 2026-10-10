@@ -19,11 +19,11 @@
         builtins.head
       ];
     minimum_zig_version = parseVersionFieldFromZon "minimum_zig_version";
-    zlsVersionShort = parseVersionFieldFromZon "version";
-    zlsVersionFull =
-      zlsVersionShort
+    zigAnalyzerVersionShort = parseVersionFieldFromZon "version";
+    zigAnalyzerVersionFull =
+      zigAnalyzerVersionShort
       + (
-        if (builtins.length (builtins.splitVersion zlsVersionShort)) == 3
+        if (builtins.length (builtins.splitVersion zigAnalyzerVersionShort)) == 3
         then ""
         else "+" + lib.replaceString "-" "." (self.dirtyShortRev or self.shortRev)
       );
@@ -44,11 +44,11 @@
         in {
           formatter.${system} = pkgs.alejandra;
           packages.${system} = rec {
-            default = zls;
-            zls = pkgs.stdenvNoCC.mkDerivation {
-              name = "zls";
-              version = zlsVersionShort;
-              meta.mainProgram = "zls";
+            default = zigAnalyzer;
+            zigAnalyzer = pkgs.stdenvNoCC.mkDerivation {
+              name = "zig-analyzer";
+              version = zigAnalyzerVersionShort;
+              meta.mainProgram = "zig_analyzer";
               src = fs.toSource {
                 root = ./.;
                 fileset = fs.intersection (fs.fromSource (lib.sources.cleanSource ./.)) (
@@ -69,10 +69,10 @@
                 PACKAGE_DIR=${pkgs.callPackage ./deps.nix {}}
               '';
               buildPhase = ''
-                zig build install --system $PACKAGE_DIR -Dtarget=${target} -Doptimize=ReleaseSafe -Dversion-string=${zlsVersionFull} --color off --prefix $out
+                zig build install --system $PACKAGE_DIR -Dtarget=${target} -Doptimize=ReleaseSafe -Dversion-string=${zigAnalyzerVersionFull} --color off --prefix $out
               '';
               checkPhase = ''
-                zig build test --system $PACKAGE_DIR -Dtarget=${target} -Dversion-string=${zlsVersionFull} --color off
+                zig build test --system $PACKAGE_DIR -Dtarget=${target} -Dversion-string=${zigAnalyzerVersionFull} --color off
               '';
             };
           };

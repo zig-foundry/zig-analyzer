@@ -18,10 +18,10 @@ body:
     validations:
       required: true
   - type: input
-    id: zls-version
+    id: zig-analyzer-version
     attributes:
-      label: ZLS Version
-      description: "The output of `zls --version` or git commit hash"
+      label: ZigAnalyzer Version
+      description: "The output of `zig-analyzer --version` or git commit hash"
       placeholder: "b21039d51261923c665d3bc58fadc4b4d5e221ea"
     validations:
       required: true
@@ -54,15 +54,15 @@ body:
   - type: textarea
     id: logs
     attributes:
-      label: Attach ZLS log output
-      description: Refer to the [documentation](https://zigtools.org/zls/guides/view-logs/) on how to aquire the ZLS log output.
+      label: Attach ZigAnalyzer log output
+      description: Refer to the [documentation](https://zigtools.org/zls/guides/view-logs/) on how to aquire the ZigAnalyzer log output.
       value: |
-        <details><summary>zls.log</summary>
+        <details><summary>zig-analyzer.log</summary>
 
         <!-- Paste the logs inside the code block below. -->
         <!-- The placeholder below shows how they typically look like. -->
         ```log
-        info  ( main ): Starting ZLS      VERSION @ '/path/to/zls'
+        info  ( main ): Starting ZigAnalyzer      VERSION @ '/path/to/zig-analyzer'
         ...
         ```
 

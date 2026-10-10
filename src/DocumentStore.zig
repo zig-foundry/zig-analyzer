@@ -55,7 +55,7 @@ pub const BuildFile = struct {
     uri: Uri,
     /// this build file may have an explicitly specified path to builtin.zig
     builtin_uri: ?Uri = null,
-    /// config options extracted from zls.build.json
+    /// config options extracted from zig-analyzer.build.json
     build_associated_config: ?std.json.Parsed(BuildAssociatedConfig) = null,
     impl: struct {
         mutex: std.Io.Mutex = .init,
@@ -1248,7 +1248,7 @@ pub fn isInStd(uri: Uri) bool {
     return std.mem.find(u8, uri.raw, "/std/") != null;
 }
 
-/// looks for a `zls.build.json` file in the build file directory
+/// looks for a `zig-analyzer.build.json` file in the build file directory
 /// has to be freed with `json_compat.parseFree`
 fn loadBuildAssociatedConfiguration(io: std.Io, allocator: std.mem.Allocator, build_file: BuildFile) !std.json.Parsed(BuildAssociatedConfig) {
     const tracy_zone = tracy.trace(@src());
@@ -1256,7 +1256,7 @@ fn loadBuildAssociatedConfiguration(io: std.Io, allocator: std.mem.Allocator, bu
 
     const build_file_path = try build_file.uri.toFsPath(allocator);
     defer allocator.free(build_file_path);
-    const config_file_path = try std.Io.Dir.path.resolve(allocator, &.{ build_file_path, "..", "zls.build.json" });
+    const config_file_path = try std.Io.Dir.path.resolve(allocator, &.{ build_file_path, "..", "zig-analyzer.build.json" });
     defer allocator.free(config_file_path);
 
     const file_buf = try std.Io.Dir.cwd().readFileAlloc(

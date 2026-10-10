@@ -511,7 +511,7 @@ fn initializeHandler(server: *Server, arena: std.mem.Allocator, request: types.I
 
     return .{
         .serverInfo = .{
-            .name = "zls",
+            .name = "zig-analyzer",
             .version = build_options.version_string,
         },
         .capabilities = .{
@@ -658,7 +658,7 @@ fn registerCapability(server: *Server, method: []const u8, registersOptions: ?ty
 fn requestConfiguration(server: *Server) Error!void {
     const configuration_items: [1]types.workspace.configuration.Item = .{
         .{
-            .section = "zls",
+            .section = "zig-analyzer",
             .scopeUri = if (server.workspaces.items.len == 1) server.workspaces.items[0].uri.raw else null,
         },
     };
@@ -947,7 +947,7 @@ fn didChangeConfigurationHandler(server: *Server, arena: std.mem.Allocator, noti
                 try server.requestConfiguration();
                 return;
             }
-            break :blk object.get("zls") orelse notification.settings;
+            break :blk object.get("zig-analyzer") orelse notification.settings;
         },
         else => notification.settings, // We will definitely fail to parse this
     };
@@ -1054,28 +1054,28 @@ pub fn resolveConfiguration(server: *Server) error{ Canceled, OutOfMemory }!void
         if (zig_exe.supported) break :check;
 
         const zig_version = zig_exe.version;
-        const zls_version = build_options.version;
+        const zig_analyzer_version = build_options.version;
 
         const zig_version_is_tagged = zig_version.pre == null;
-        const zls_version_is_tagged = zls_version.pre == null;
+        const zig_analyzer_version_is_tagged = zig_analyzer_version.pre == null;
 
         if (zig_version_is_tagged) {
             server.showMessage(
                 .Warning,
                 "ZigAnalyzer '{f}' does not support Zig '{f}'. A ZigAnalyzer '{}.{}' release should be used instead.",
-                .{ zls_version, zig_version, zig_version.major, zig_version.minor },
+                .{ zig_analyzer_version, zig_version, zig_version.major, zig_version.minor },
             );
-        } else if (zls_version_is_tagged) {
+        } else if (zig_analyzer_version_is_tagged) {
             server.showMessage(
                 .Warning,
                 "ZigAnalyzer '{f}' should be used with a Zig '{}.{}' release but found Zig '{f}'.",
-                .{ zls_version, zls_version.major, zls_version.minor, zig_version },
+                .{ zig_analyzer_version, zig_analyzer_version.major, zig_analyzer_version.minor, zig_version },
             );
         } else {
             server.showMessage(
                 .Warning,
                 "ZigAnalyzer '{f}' requires at least Zig '{s}' but got Zig '{f}'. Update Zig to avoid unexpected behavior.",
-                .{ zls_version, build_options.minimum_runtime_zig_version_string, zig_version },
+                .{ zig_analyzer_version, build_options.minimum_runtime_zig_version_string, zig_version },
             );
         }
     }

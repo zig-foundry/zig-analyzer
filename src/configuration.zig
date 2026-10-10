@@ -176,14 +176,14 @@ pub const Manager = struct {
             };
 
             const build_options = @import("build_options");
-            const is_zls_version_tagged = build_options.version.pre == null;
+            const is_zig_analyzer_version_tagged = build_options.version.pre == null;
             const min_runtime_zig_version = comptime std.SemanticVersion.parse(build_options.minimum_runtime_zig_version_string) catch unreachable;
 
             manager.zig_exe = .{
                 .path = zig_env.zig_exe,
                 .version = zig_version,
                 .env = zig_env,
-                .supported = zigVersionCheck(min_runtime_zig_version, zig_version, is_zls_version_tagged),
+                .supported = zigVersionCheck(min_runtime_zig_version, zig_version, is_zig_analyzer_version_tagged),
             };
         }
         config.zig_exe_path = if (manager.zig_exe) |exe| exe.path else null;
@@ -765,23 +765,23 @@ fn zigVersionCheck(
 test {
     const build_options = @import("build_options");
     const current_zig_version = @import("builtin").zig_version;
-    const is_zls_version_tagged = build_options.version.pre == null;
+    const is_zig_analyzer_version_tagged = build_options.version.pre == null;
     const min_runtime_zig_version = comptime std.SemanticVersion.parse(build_options.minimum_runtime_zig_version_string) catch unreachable;
 
     // The build runner must support the Zig version that ZigAnalyzer is being built with
     try std.testing.expect(zigVersionCheck(
         min_runtime_zig_version,
         current_zig_version,
-        is_zls_version_tagged,
+        is_zig_analyzer_version_tagged,
     ));
 
-    if (is_zls_version_tagged) {
+    if (is_zig_analyzer_version_tagged) {
         // A tagged release of ZigAnalyzer should support the same tagged release of Zig
         // Example: ZigAnalyzer 0.12.0 should support Zig 0.12.x -- It is possible that ZigAnalyzer requires a minimum patch version
         try std.testing.expect(zigVersionCheck(
             .{ .major = current_zig_version.major, .minor = current_zig_version.minor, .patch = 999 },
             min_runtime_zig_version,
-            is_zls_version_tagged,
+            is_zig_analyzer_version_tagged,
         ));
     }
 }

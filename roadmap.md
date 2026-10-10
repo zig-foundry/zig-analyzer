@@ -1,6 +1,6 @@
 # Roadmap
 
-Tracks the fork from `zigtools/zls`: what works, what is still `zls`-named, and which upstream bugs apply here. Zig version: 0.17.0.
+Tracks the fork from `zigtools/zls`: what works and which upstream bugs apply here. Zig version: 0.17.0.
 
 ## Features
 
@@ -21,8 +21,7 @@ Tracks the fork from `zigtools/zls`: what works, what is still `zls`-named, and 
 | diagnostics (ast, ast-check, style, autofix) | done |
 | code actions | done |
 | build runner integration (upstream #3208) | not started |
-| `zls.json` / `zls.log` / `zig.zls.*` rename to `zig-analyzer` | working |
-| server name / config section `zls` rename (`Server.zig:514,661,950`) | working |
+| `zls` refs rename to `zig-analyzer` (config, settings, CLI, build) | done |
 | release workflow + install script | done |
 | CI (build + coverage on 0.17.0) | done |
 
