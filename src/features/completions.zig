@@ -917,49 +917,11 @@ fn completeFileSystemStringLiteral(builder: *Builder, pos_context: Analyser.Posi
             });
         }
 
-        if (!DocumentStore.supports_build_system) {
-            // no build system modules
-        } else if (DocumentStore.isBuildFile(builder.orig_handle.uri)) blk: {
-            const build_file = store.getBuildFile(builder.orig_handle.uri) orelse break :blk;
-            const build_config = build_file.tryLockConfig(store.io) orelse break :blk;
-            defer build_file.unlockConfig(store.io);
-
-            try builder.completions.ensureUnusedCapacity(builder.arena, build_config.dependencies.map.count());
-            for (build_config.dependencies.map.keys(), build_config.dependencies.map.values()) |name, path| {
-                try builder.completions.append(builder.arena, .{
-                    .label = name,
-                    .kind = .Module,
-                    .detail = path,
-                    .sortText = try generateSortText(builder.arena, 4, name),
-                });
-            }
-        } else switch (try builder.orig_handle.getAssociatedBuildFile(store)) {
-            .none, .unresolved => {},
-            .resolved => |resolved| blk: {
-                const build_config = resolved.build_file.tryLockConfig(store.io) orelse break :blk;
-                defer resolved.build_file.unlockConfig(store.io);
-
-                const module = build_config.modules.map.get(resolved.root_source_file) orelse break :blk;
-
-                try builder.completions.ensureUnusedCapacity(builder.arena, 1 + module.import_table.map.count());
-
-                builder.completions.appendAssumeCapacity(.{
-                    .label = "root",
-                    .kind = .Module,
-                    .detail = try builder.arena.dupe(u8, resolved.root_source_file),
-                    .sortText = "3",
-                });
-
-                for (module.import_table.map.keys(), module.import_table.map.values()) |name, root_source_file| {
-                    builder.completions.appendAssumeCapacity(.{
-                        .label = try builder.arena.dupe(u8, name),
-                        .kind = .Module,
-                        .detail = try builder.arena.dupe(u8, root_source_file),
-                        .sortText = try generateSortText(builder.arena, 4, name),
-                    });
-                }
-            },
-        }
+        // No build system modules: the build runner was removed for Zig 0.17,
+        // see `DocumentStore.supports_build_system`. Named modules from
+        // `build.zig` get no completions until a new configuration protocol lands.
+        // `std` and `builtin` above keep working, relative `.zig` paths are
+        // completed further below.
 
         const string_content_range = offsets.locToRange(source, .{ .start = insert_loc.start, .end = string_content_loc.end }, builder.server.offset_encoding);
 

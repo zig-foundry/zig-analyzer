@@ -14,8 +14,6 @@ const DocumentScope = @import("DocumentScope.zig");
 const DiagnosticsCollection = @import("DiagnosticsCollection.zig");
 const TrigramStore = @import("TrigramStore.zig");
 
-const BuildConfig = @compileError("https://github.com/zigtools/zls/issues/3208");
-
 const DocumentStore = @This();
 
 io: std.Io,
@@ -25,7 +23,11 @@ config: Config,
 mutex: std.Io.Mutex = .init,
 wait_group: if (supports_build_system) std.Io.Group else void = if (supports_build_system) .init else {},
 handles: Uri.ArrayHashMap(*Handle.Future) = .empty,
-build_files: if (supports_build_system) Uri.ArrayHashMap(*BuildFile) else void = if (supports_build_system) .empty else {},
+/// Every known `build.zig`, found by walking up from open documents.
+/// The map is always live: discovering build files only reads
+/// `zig-analyzer.build.json`, it never executes `build.zig`.
+/// (Executing it needed the removed build runner.)
+build_files: Uri.ArrayHashMap(*BuildFile) = .empty,
 diagnostics_collection: *DiagnosticsCollection,
 builds_in_progress: std.atomic.Value(i32) = .init(0),
 transport: ?*lsp.Transport = null,
@@ -35,8 +37,15 @@ lsp_capabilities: struct {
     supports_inlay_hints_refresh: bool = false,
 } = .{},
 
-/// https://github.com/zigtools/zls/issues/3208
-pub const supports_build_system = false and std.process.can_spawn;
+/// Whether build.zig files are executed to resolve modules, dependencies and compilation units.
+/// Disabled on purpose: Zig 0.17 removed the `--build-runner` flag when the build
+/// system was split into a separate configure and make phase (upstream issue
+/// https://github.com/zigtools/zls/issues/3208). Upstream ZLS removed the build
+/// runner instead of porting it, and this fork follows that decision.
+/// `@import` of relative `.zig`/`.zon` files, `std` and `builtin` keep working.
+/// Named modules from `build.zig` (`@import("my_module")`, `@import("root")`)
+/// cannot be resolved until a new configuration protocol is implemented.
+pub const supports_build_system = false;
 
 pub const Config = struct {
     environ_map: *const std.process.Environ.Map,
@@ -59,36 +68,13 @@ pub const BuildFile = struct {
     build_associated_config: ?std.json.Parsed(BuildAssociatedConfig) = null,
     impl: struct {
         mutex: std.Io.Mutex = .init,
-        build_runner_state: BuildRunnerState = .idle,
-        version: u32 = 0,
-        /// contains information extracted from running build.zig with a custom build runner
-        /// e.g. include paths & packages
-        /// TODO this field should not be nullable, callsites should await the build config to be resolved
-        /// and then continue instead of dealing with missing information.
-        config: ?std.json.Parsed(BuildConfig) = null,
     } = .{},
 
-    const BuildRunnerState = enum {
-        idle,
-        running,
-        running_but_already_invalidated,
-    };
-
-    pub fn tryLockConfig(self: *BuildFile, io: std.Io) ?BuildConfig {
-        self.impl.mutex.lockUncancelable(io);
-        return if (self.impl.config) |cfg| cfg.value else {
-            self.impl.mutex.unlock(io);
-            return null;
-        };
-    }
-
-    pub fn unlockConfig(self: *BuildFile, io: std.Io) void {
-        self.impl.mutex.unlock(io);
-    }
-
     /// Returns whether the `Uri` is a dependency of the given `BuildFile`.
-    /// May return `.unknown` to indicate an inconclusive result because
-    /// the required build config has not been resolved yet.
+    /// Always returns `.unknown`: without a build runner there is no module graph
+    /// to check membership against (see `supports_build_system`).
+    /// Callers treat `.unknown` as "cannot prove association", same as before
+    /// when the build config had not been resolved yet.
     ///
     /// **Thread safe** takes an exclusive lock
     fn isAssociatedWith(
@@ -101,58 +87,14 @@ pub const BuildFile = struct {
         /// Stores the `root_source_file`. Caller owns returned memory.
         yes: []const u8,
     } {
-        const tracy_zone = tracy.trace(@src());
-        defer tracy_zone.end();
-
-        const allocator = store.allocator;
-        const io = store.io;
-
-        var arena_allocator: std.heap.ArenaAllocator = .init(allocator);
-        defer arena_allocator.deinit();
-
-        const arena = arena_allocator.allocator();
-
-        var module_root_source_file_paths: std.ArrayList([]const u8) = .empty;
-
-        {
-            const build_config = build_file.tryLockConfig(io) orelse return .unknown;
-            defer build_file.unlockConfig(io);
-
-            const module_paths = build_config.modules.map.keys();
-
-            try module_root_source_file_paths.ensureUnusedCapacity(arena, module_paths.len);
-            for (module_paths) |module_path| {
-                module_root_source_file_paths.appendAssumeCapacity(try arena.dupe(u8, module_path));
-            }
-        }
-
-        var found_uris: Uri.ArrayHashMap(void) = .empty;
-
-        var i: usize = 0;
-
-        for (module_root_source_file_paths.items) |root_source_file| {
-            try found_uris.put(arena, try .fromPath(arena, root_source_file), {});
-
-            while (i < found_uris.count()) : (i += 1) {
-                const source_uri = found_uris.keys()[i];
-                if (uri.eql(source_uri)) {
-                    return .{ .yes = try allocator.dupe(u8, root_source_file) };
-                }
-                if (isInStd(source_uri)) continue;
-
-                const handle = try store.getOrLoadHandle(source_uri) orelse continue;
-
-                try found_uris.ensureUnusedCapacity(arena, handle.file_imports.len);
-                for (handle.file_imports) |import_uri| found_uris.putAssumeCapacity(try import_uri.dupe(arena), {});
-            }
-        }
-
-        return .no;
+        _ = build_file;
+        _ = uri;
+        _ = store;
+        return .unknown;
     }
 
     fn deinit(self: *BuildFile, allocator: std.mem.Allocator) void {
         self.uri.deinit(allocator);
-        if (self.impl.config) |cfg| cfg.deinit();
         if (self.builtin_uri) |builtin_uri| builtin_uri.deinit(allocator);
         if (self.build_associated_config) |cfg| cfg.deinit();
     }
@@ -236,8 +178,6 @@ pub const Handle = struct {
     /// `DocumentStore.build_files` is guaranteed to contain this Uri.
     /// Uri memory managed by its build_file
     pub fn getAssociatedBuildFile(self: *Handle, document_store: *DocumentStore) error{ Canceled, OutOfMemory }!AssociatedBuildFile {
-        comptime std.debug.assert(supports_build_system);
-
         try self.impl.lock.lock(document_store.io);
         defer self.impl.lock.unlock(document_store.io);
 
@@ -331,73 +271,26 @@ pub const Handle = struct {
     };
 
     /// Returns the root source file of the root module of the given handle. Same as `@import("root")`.
+    /// Always resolves to `.none` or `.unresolved`: without a build runner there is
+    /// no compilation graph to search (see `supports_build_system`).
     pub fn getAssociatedCompilationUnits(self: *Handle, document_store: *DocumentStore) error{ Canceled, OutOfMemory }!GetAssociatedCompilationUnitsResult {
-        const allocator = document_store.allocator;
-        const io = document_store.io;
-
-        const build_file, const target_root_source_file = switch (self.impl.associated_compilation_units) {
+        switch (self.impl.associated_compilation_units) {
+            .unresolved => {},
             else => return self.impl.associated_compilation_units,
-            .unresolved => switch (try self.getAssociatedBuildFile(document_store)) {
-                .none => return .none,
-                .unresolved => return .unresolved,
-                .resolved => |resolved| .{ resolved.build_file, resolved.root_source_file },
+        }
+        switch (try self.getAssociatedBuildFile(document_store)) {
+            // Without a module graph every build file association stays inconclusive,
+            // report `.unresolved` so callers fall back to file-based resolution.
+            .unresolved => return .unresolved,
+            .none => {
+                self.impl.associated_compilation_units = .none;
+                return .none;
             },
-        };
-
-        const build_config = build_file.tryLockConfig(io) orelse return .none;
-        defer build_file.unlockConfig(io);
-
-        const modules = &build_config.modules.map;
-
-        var visted: std.bit_set.Dynamic = try .initEmpty(allocator, modules.count());
-        defer visted.deinit(allocator);
-
-        var queue: std.ArrayList(usize) = try .initCapacity(allocator, 1);
-        defer queue.deinit(allocator);
-
-        const target_index = modules.getIndex(target_root_source_file).?;
-
-        // We only care about the root source file of each root module so we convert them to a set.
-        var root_modules: std.array_hash_map.String(void) = .empty;
-        defer root_modules.deinit(allocator);
-
-        try root_modules.ensureTotalCapacity(allocator, build_config.compilations.len);
-        for (build_config.compilations) |compile| {
-            root_modules.putAssumeCapacity(compile.root_module, {});
+            // `getAssociatedBuildFile` never resolves while `supports_build_system`
+            // is disabled, but keep the arm so this keeps compiling if a new
+            // configuration protocol lands.
+            .resolved => return .unresolved,
         }
-
-        var results: std.ArrayList([]const u8) = .empty;
-        defer results.deinit(allocator);
-
-        // Do a graph search from root modules until we reach `root_source_file`
-        for (root_modules.keys()) |root_module| {
-            visted.unsetAll();
-            queue.clearRetainingCapacity();
-            queue.appendAssumeCapacity(modules.getIndex(root_module).?);
-
-            while (queue.pop()) |index| {
-                if (index == target_index) {
-                    try results.append(allocator, root_module);
-                    break;
-                }
-
-                if (visted.isSet(index)) continue;
-                visted.set(index);
-
-                const imported_modules = modules.values()[index].import_table.map.values();
-                try queue.ensureUnusedCapacity(allocator, imported_modules.len);
-                for (imported_modules) |root_source_file| {
-                    queue.appendAssumeCapacity(modules.getIndex(root_source_file) orelse continue);
-                }
-            }
-        }
-
-        if (results.items.len == 0) {
-            self.impl.associated_compilation_units = .none;
-        } else {
-            self.impl.associated_compilation_units = .{ .resolved = try results.toOwnedSlice(allocator) };
-        }
-        return self.impl.associated_compilation_units;
     }
 
     fn refresh(
@@ -670,13 +563,11 @@ pub fn deinit(self: *DocumentStore) void {
     }
     self.handles.deinit(self.allocator);
 
-    if (supports_build_system) {
-        for (self.build_files.values()) |build_file| {
-            build_file.deinit(self.allocator);
-            self.allocator.destroy(build_file);
-        }
-        self.build_files.deinit(self.allocator);
+    for (self.build_files.values()) |build_file| {
+        build_file.deinit(self.allocator);
+        self.allocator.destroy(build_file);
     }
+    self.build_files.deinit(self.allocator);
 
     self.* = undefined;
 }
@@ -757,7 +648,6 @@ pub fn getOrLoadHandle(self: *DocumentStore, uri: Uri) error{ Canceled, OutOfMem
 /// **Thread safe** takes a shared lock
 /// This function does not protect against data races from modifying the BuildFile
 pub fn getBuildFile(self: *DocumentStore, uri: Uri) ?*BuildFile {
-    comptime std.debug.assert(supports_build_system);
     self.mutex.lockUncancelable(self.io);
     defer self.mutex.unlock(self.io);
     return self.build_files.get(uri);
@@ -767,8 +657,6 @@ pub fn getBuildFile(self: *DocumentStore, uri: Uri) ?*BuildFile {
 /// **Thread safe** takes an exclusive lock
 /// This function does not protect against data races from modifying the BuildFile
 fn getOrLoadBuildFile(self: *DocumentStore, uri: Uri) error{ Canceled, OutOfMemory }!*BuildFile {
-    comptime std.debug.assert(supports_build_system);
-
     if (self.getBuildFile(uri)) |build_file| return build_file;
 
     const new_build_file: *BuildFile = blk: {
@@ -913,18 +801,14 @@ pub fn refreshDocumentFromFileSystem(self: *DocumentStore, uri: Uri, should_dele
     return true;
 }
 
-/// Invalidates a build files.
+/// Invalidates a build file.
+/// Currently a no-op: there is no build runner to re-run while
+/// `supports_build_system` is disabled. Kept so callers in `Server` keep
+/// working unchanged when a new configuration protocol lands.
 /// **Thread safe** takes a shared lock
 pub fn invalidateBuildFile(self: *DocumentStore, build_file_uri: Uri) void {
-    comptime std.debug.assert(supports_build_system);
-
-    if (self.config.zig_exe_path == null) return;
-    if (self.config.global_cache_dir == null) return;
-    if (self.config.zig_lib_dir == null) return;
-
-    const build_file = self.getBuildFile(build_file_uri) orelse return;
-
-    self.wait_group.async(self.io, invalidateBuildFileWorker, .{ self, build_file });
+    _ = self;
+    _ = build_file_uri;
 }
 
 const LoadDirectoryError = error{UnsupportedScheme} || std.mem.Allocator.Error || std.Io.Dir.OpenError;
@@ -1047,192 +931,6 @@ pub fn loadTrigramStores(
     if (did_out_of_memory.load(.acquire)) return error.OutOfMemory;
 
     return try handles.toOwnedSlice(store.allocator);
-}
-
-const progress_token = "buildProgressToken";
-
-fn notifyBuildStart(self: *DocumentStore) void {
-    if (!self.lsp_capabilities.supports_work_done_progress) return;
-
-    const transport = self.transport orelse return;
-
-    // Atomicity note: We do not actually care about memory surrounding the
-    // counter, we only care about the counter itself. We only need to ensure
-    // we aren't double entering/exiting
-    const prev = self.builds_in_progress.fetchAdd(1, .monotonic);
-    if (prev != 0) return;
-
-    const old_cancel_protect = self.io.swapCancelProtection(.blocked);
-    defer _ = self.io.swapCancelProtection(old_cancel_protect);
-
-    transport.writeRequest(
-        self.io,
-        self.allocator,
-        .{ .string = "progress" },
-        "window/workDoneProgress/create",
-        lsp.types.window.work_done_progress.CreateParams,
-        .{
-            .token = .{ .string = progress_token },
-        },
-        .{ .emit_null_optional_fields = false },
-    ) catch |err| switch (err) {
-        error.Canceled => unreachable,
-        else => |e| {
-            log.err("Failed to send create work message: {}", .{e});
-            return;
-        },
-    };
-
-    transport.writeNotification(
-        self.io,
-        self.allocator,
-        "$/progress",
-        lsp.types.window.work_done_progress.Begin,
-        .{
-            .title = "Loading build configuration",
-        },
-        .{ .emit_null_optional_fields = false },
-    ) catch |err| switch (err) {
-        error.Canceled => unreachable,
-        else => |e| {
-            log.err("Failed to send progress start message: {}", .{e});
-            return;
-        },
-    };
-}
-
-const EndStatus = enum { success, failed };
-
-fn notifyBuildEnd(self: *DocumentStore, status: EndStatus) void {
-    if (!self.lsp_capabilities.supports_work_done_progress) return;
-
-    const transport = self.transport orelse return;
-
-    // Atomicity note: We do not actually care about memory surrounding the
-    // counter, we only care about the counter itself. We only need to ensure
-    // we aren't double entering/exiting
-    const prev = self.builds_in_progress.fetchSub(1, .monotonic);
-    if (prev != 1) return;
-
-    const old_cancel_protect = self.io.swapCancelProtection(.blocked);
-    defer _ = self.io.swapCancelProtection(old_cancel_protect);
-
-    transport.writeNotification(
-        self.io,
-        self.allocator,
-        "$/progress",
-        lsp.types.window.work_done_progress.End,
-        .{
-            .message = switch (status) {
-                .failed => "Failed",
-                .success => "Success",
-            },
-        },
-        .{ .emit_null_optional_fields = false },
-    ) catch |err| switch (err) {
-        error.Canceled => unreachable,
-        else => |e| {
-            log.err("Failed to send progress end message: {}", .{e});
-            return;
-        },
-    };
-}
-
-fn invalidateBuildFileWorker(self: *DocumentStore, build_file: *BuildFile) std.Io.Cancelable!void {
-    const tracy_zone = tracy.trace(@src());
-    defer tracy_zone.end();
-
-    {
-        try build_file.impl.mutex.lock(self.io);
-        defer build_file.impl.mutex.unlock(self.io);
-
-        switch (build_file.impl.build_runner_state) {
-            .idle => build_file.impl.build_runner_state = .running,
-            .running => {
-                build_file.impl.build_runner_state = .running_but_already_invalidated;
-                return;
-            },
-            .running_but_already_invalidated => return,
-        }
-    }
-
-    self.notifyBuildStart();
-
-    while (true) {
-        build_file.impl.version += 1;
-        const new_version = build_file.impl.version;
-
-        const loadBuildConfiguration = if (true) @compileError("https://github.com/zigtools/zls/issues/3208");
-        const build_config = loadBuildConfiguration(self, build_file.uri, new_version) catch |err| switch (err) {
-            error.Canceled => return error.Canceled,
-            else => |e| {
-                if (e != error.RunFailed) { // already logged
-                    log.err("Failed to load build configuration for {s} (error: {})", .{ build_file.uri.raw, e });
-                }
-                self.notifyBuildEnd(.failed);
-                build_file.impl.mutex.lockUncancelable(self.io);
-                defer build_file.impl.mutex.unlock(self.io);
-                build_file.impl.build_runner_state = .idle;
-                return;
-            },
-        };
-
-        build_file.impl.mutex.lockUncancelable(self.io);
-        switch (build_file.impl.build_runner_state) {
-            .idle => unreachable,
-            .running => {
-                var old_config = build_file.impl.config;
-                build_file.impl.config = build_config;
-                build_file.impl.build_runner_state = .idle;
-                build_file.impl.mutex.unlock(self.io);
-
-                if (old_config) |*config| config.deinit();
-                self.notifyBuildEnd(.success);
-                break;
-            },
-            .running_but_already_invalidated => {
-                build_file.impl.build_runner_state = .running;
-                build_file.impl.mutex.unlock(self.io);
-
-                build_config.deinit();
-                continue;
-            },
-        }
-    }
-
-    if (self.transport) |transport| {
-        const old_cancel_protect = self.io.swapCancelProtection(.blocked);
-        defer _ = self.io.swapCancelProtection(old_cancel_protect);
-
-        if (self.lsp_capabilities.supports_semantic_tokens_refresh) {
-            transport.writeRequest(
-                self.io,
-                self.allocator,
-                .{ .string = "semantic_tokens_refresh" },
-                "workspace/semanticTokens/refresh",
-                ?void,
-                null,
-                .{ .emit_null_optional_fields = false },
-            ) catch |err| switch (err) {
-                error.Canceled => unreachable,
-                else => {},
-            };
-        }
-        if (self.lsp_capabilities.supports_inlay_hints_refresh) {
-            transport.writeRequest(
-                self.io,
-                self.allocator,
-                .{ .string = "inlay_hints_refresh" },
-                "workspace/inlayHint/refresh",
-                ?void,
-                null,
-                .{ .emit_null_optional_fields = false },
-            ) catch |err| switch (err) {
-                error.Canceled => unreachable,
-                else => {},
-            };
-        }
-    }
 }
 
 pub fn isBuildFile(uri: Uri) bool {
@@ -1409,7 +1107,11 @@ fn createAndStoreDocument(
         .uri => {},
     };
 
-    if (supports_build_system and options.lsp_synced and isBuildFile(uri) and !isInStd(uri)) {
+    // Register opened `build.zig` files so their `zig-analyzer.build.json`
+    // (builtin path override, build options) is honored. Nothing executes
+    // the build file: `invalidateBuildFile` is a no-op while there is no
+    // build runner (see `supports_build_system`).
+    if (options.lsp_synced and isBuildFile(uri) and !isInStd(uri)) {
         switch (options.load_build_file_behaviour) {
             .load_but_dont_update => {
                 _ = try store.getOrLoadBuildFile(uri);
@@ -1545,15 +1247,16 @@ pub fn uriFromImportStr(
     }
 
     if (std.mem.eql(u8, import_str, "builtin")) {
-        if (supports_build_system) {
-            switch (try handle.getAssociatedBuildFile(self)) {
-                .none, .unresolved => {},
-                .resolved => |resolved| {
-                    if (resolved.build_file.builtin_uri) |builtin_uri| {
-                        return .{ .one = try builtin_uri.dupe(allocator) };
-                    }
-                },
-            }
+        // A `build.zig` may point at its own generated `builtin.zig` through
+        // `zig-analyzer.build.json` (`relative_builtin_path`). Honor that
+        // before falling back to the globally configured path.
+        switch (try handle.getAssociatedBuildFile(self)) {
+            .none, .unresolved => {},
+            .resolved => |resolved| {
+                if (resolved.build_file.builtin_uri) |builtin_uri| {
+                    return .{ .one = try builtin_uri.dupe(allocator) };
+                }
+            },
         }
         if (self.config.builtin_path) |builtin_path| {
             return .{ .one = try .fromPath(allocator, builtin_path) };
@@ -1561,44 +1264,14 @@ pub fn uriFromImportStr(
         return .none;
     }
 
-    if (!supports_build_system) return .none;
-
-    if (std.mem.eql(u8, import_str, "root")) {
-        const root_source_files = switch (try handle.getAssociatedCompilationUnits(self)) {
-            .none, .unresolved => return .none,
-            .resolved => |root_source_files| root_source_files,
-        };
-        var uris: std.ArrayList(Uri) = try .initCapacity(allocator, root_source_files.len);
-        defer {
-            for (uris.items) |uri| uri.deinit(allocator);
-            uris.deinit(allocator);
-        }
-        for (root_source_files) |root_source_file| {
-            uris.appendAssumeCapacity(try .fromPath(allocator, root_source_file));
-        }
-        return .{ .many = try uris.toOwnedSlice(allocator) };
-    }
-
-    if (isBuildFile(handle.uri)) blk: {
-        const build_file = self.getBuildFile(handle.uri) orelse break :blk;
-        const build_config = build_file.tryLockConfig(self.io) orelse break :blk;
-        defer build_file.unlockConfig(self.io);
-
-        if (build_config.dependencies.map.get(import_str)) |path| {
-            return .{ .one = try .fromPath(allocator, path) };
-        }
+    if (!supports_build_system) {
+        // Named `@import`s (`@import("my_module")`, `@import("root")`, dependency
+        // names inside `build.zig`) need the module graph from a build runner.
+        // There is none on Zig 0.17 (see `supports_build_system`), so report
+        // `.none` and let callers fall back to file-based resolution.
+        // A new configuration protocol must add its resolution logic here.
         return .none;
     }
 
-    switch (try handle.getAssociatedBuildFile(self)) {
-        .none, .unresolved => return .none,
-        .resolved => |resolved| {
-            const build_config = resolved.build_file.tryLockConfig(self.io) orelse return .none;
-            defer resolved.build_file.unlockConfig(self.io);
-
-            const module = build_config.modules.map.get(resolved.root_source_file) orelse return .none;
-            const imported_root_source_file = module.import_table.map.get(import_str) orelse return .none;
-            return .{ .one = try .fromPath(allocator, imported_root_source_file) };
-        },
-    }
+    comptime unreachable;
 }

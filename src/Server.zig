@@ -6,7 +6,6 @@
 const Server = @This();
 
 const std = @import("std");
-const zig_builtin = @import("builtin");
 const build_options = @import("build_options");
 const Config = @import("Config.zig");
 const configuration = @import("configuration.zig");
@@ -25,13 +24,16 @@ const semantic_tokens = @import("features/semantic_tokens.zig");
 const code_actions = @import("features/code_actions.zig");
 const diagnostics_gen = @import("features/diagnostics.zig");
 
-const BuildOnSave = @compileError("https://github.com/zigtools/zls/issues/3208");
-const BuildOnSaveSupport = struct {
-    pub inline fn isSupportedComptime() bool {
-        return false;
-    }
-};
-
+/// Build-On-Save and the `--build-runner` based build configuration loader were
+/// removed for Zig 0.17: the toolchain dropped the `--build-runner` flag when the
+/// build system was split into a separate configure and make phase (upstream
+/// issue https://github.com/zigtools/zls/issues/3208). Upstream ZLS removed the
+/// build runner instead of porting it ("remove build runner, won't be missed"),
+/// and this fork follows that decision.
+/// The `enable_build_on_save` / `build_on_save_args` settings are still accepted
+/// so existing configs keep parsing, but the server logs that they are ignored
+/// (see `resolveConfiguration`). If a new configuration protocol lands, its
+/// per-workspace state belongs on `Workspace` again.
 const log = std.log.scoped(.server);
 
 // public fields
@@ -753,8 +755,6 @@ fn handleConfiguration(server: *Server, json: std.json.Value) error{ Canceled, O
 
 const Workspace = struct {
     uri: Uri,
-    build_on_save: if (BuildOnSaveSupport.isSupportedComptime()) ?BuildOnSave else void,
-    build_on_save_mode: if (BuildOnSaveSupport.isSupportedComptime()) ?enum { watch, manual } else void,
 
     fn init(server: *Server, uri: Uri) error{OutOfMemory}!Workspace {
         const duped_uri = try uri.dupe(server.allocator);
@@ -762,104 +762,17 @@ const Workspace = struct {
 
         return .{
             .uri = duped_uri,
-            .build_on_save = if (BuildOnSaveSupport.isSupportedComptime()) null else {},
-            .build_on_save_mode = if (BuildOnSaveSupport.isSupportedComptime()) null else {},
         };
     }
 
     fn deinit(workspace: *Workspace, allocator: std.mem.Allocator) void {
-        if (BuildOnSaveSupport.isSupportedComptime()) {
-            if (workspace.build_on_save) |*build_on_save| build_on_save.deinit();
-        }
         workspace.uri.deinit(allocator);
-    }
-
-    fn sendManualWatchUpdate(workspace: *Workspace) void {
-        comptime std.debug.assert(BuildOnSaveSupport.isSupportedComptime());
-
-        const build_on_save = if (workspace.build_on_save) |*build_on_save| build_on_save else return;
-        const mode = workspace.build_on_save_mode orelse return;
-        if (mode != .manual) return;
-
-        build_on_save.sendManualWatchUpdate();
-    }
-
-    fn refreshBuildOnSave(workspace: *Workspace, args: struct {
-        server: *Server,
-        /// Whether the build on save process should be restarted if it is already running.
-        restart: bool,
-    }) error{ Canceled, OutOfMemory }!void {
-        comptime std.debug.assert(BuildOnSaveSupport.isSupportedComptime());
-
-        const config = &args.server.config_manager.config;
-
-        if (args.server.config_manager.zig_exe) |zig_exe| {
-            workspace.build_on_save_mode = switch (BuildOnSaveSupport.isSupportedRuntime(zig_exe.version)) {
-                .supported => .watch,
-                // If if build on save has been explicitly enabled, fallback to the implementation with manual updates
-                else => if (config.enable_build_on_save orelse false) .manual else null,
-            };
-        } else {
-            workspace.build_on_save_mode = null;
-        }
-
-        const build_on_save_supported = workspace.build_on_save_mode != null;
-        const build_on_save_wanted = config.enable_build_on_save orelse true;
-        const enable = build_on_save_supported and build_on_save_wanted;
-
-        if (workspace.build_on_save) |*build_on_save| {
-            if (enable and !args.restart) return;
-            log.debug("stopped Build-On-Save for '{s}'", .{workspace.uri.raw});
-            build_on_save.deinit();
-            workspace.build_on_save = null;
-        }
-
-        if (!enable) return;
-
-        const zig_exe_path = config.zig_exe_path orelse return;
-        const zig_lib_path = config.zig_lib_path orelse return;
-
-        const workspace_path = workspace.uri.toFsPath(args.server.allocator) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.UnsupportedScheme => return,
-        };
-        defer args.server.allocator.free(workspace_path);
-
-        std.debug.assert(workspace.build_on_save == null);
-        workspace.build_on_save = BuildOnSave.init(.{
-            .io = args.server.io,
-            .allocator = args.server.allocator,
-            .workspace_path = workspace_path,
-            .build_on_save_args = config.build_on_save_args,
-            .check_step_only = config.enable_build_on_save == null,
-            .zig_exe_path = zig_exe_path,
-            .zig_lib_path = zig_lib_path,
-            .collection = &args.server.diagnostics_collection,
-        }) catch |err| switch (err) {
-            error.Canceled => return error.Canceled,
-            else => {
-                log.err("failed to initilize Build-On-Save for '{s}': {}", .{ workspace.uri.raw, err });
-                return;
-            },
-        };
     }
 };
 
 fn addWorkspace(server: *Server, uri: Uri) error{ Canceled, OutOfMemory }!void {
     try server.workspaces.ensureUnusedCapacity(server.allocator, 1);
     server.workspaces.appendAssumeCapacity(try Workspace.init(server, uri));
-
-    if (BuildOnSaveSupport.isSupportedComptime() and
-        // Don't initialize build on save until initialization finished.
-        // If the client supports the `workspace/configuration` request, wait
-        // until we have received workspace configuration from the server.
-        (server.status == .initialized and !server.client_capabilities.supports_configuration))
-    {
-        try server.workspaces.items[server.workspaces.items.len - 1].refreshBuildOnSave(.{
-            .server = server,
-            .restart = false,
-        });
-    }
 
     const file_count = server.document_store.loadDirectoryRecursive(uri) catch |err| switch (err) {
         error.Canceled, error.OutOfMemory => |e| return e,
@@ -985,31 +898,9 @@ pub fn resolveConfiguration(server: *Server) error{ Canceled, OutOfMemory }!void
 
     const new_zig_exe_path: bool = result.did_change.zig_exe_path;
     const new_zig_lib_path: bool = result.did_change.zig_lib_path;
-    const new_enable_build_on_save: bool = result.did_change.enable_build_on_save;
-    const new_build_on_save_args: bool = result.did_change.build_on_save_args;
     const new_force_autofix: bool = result.did_change.force_autofix;
 
     server.document_store.config = createDocumentStoreConfig(server.config_manager);
-
-    if (BuildOnSaveSupport.isSupportedComptime() and
-        // If the client supports the `workspace/configuration` request, defer
-        // build on save initialization until after we have received workspace
-        // configuration from the server
-        (!server.client_capabilities.supports_configuration or server.status == .initialized))
-    {
-        const should_restart =
-            new_zig_exe_path or
-            new_zig_lib_path or
-            new_enable_build_on_save or
-            new_build_on_save_args;
-
-        for (server.workspaces.items) |*workspace| {
-            try workspace.refreshBuildOnSave(.{
-                .server = server,
-                .restart = should_restart,
-            });
-        }
-    }
 
     if (DocumentStore.supports_build_system) {
         if (new_zig_exe_path or new_zig_lib_path) {
@@ -1081,22 +972,9 @@ pub fn resolveConfiguration(server: *Server) error{ Canceled, OutOfMemory }!void
     }
 
     if (server.config_manager.config.enable_build_on_save orelse false) {
-        if (!BuildOnSaveSupport.isSupportedComptime()) {
-            // This message is not very helpful but it relatively uncommon to happen anyway.
-            log.info("'enable_build_on_save' is ignored because build on save is not supported by this ZigAnalyzer build", .{});
-        } else if (server.status == .initialized and (server.config_manager.config.zig_exe_path == null or server.config_manager.zig_lib_dir == null)) {
-            log.warn("'enable_build_on_save' is ignored because Zig could not be found", .{});
-        } else if (!server.client_capabilities.supports_publish_diagnostics) {
-            log.warn("'enable_build_on_save' is ignored because it is not supported by {s}", .{server.client_capabilities.client_name orelse "your editor"});
-        } else if (server.status == .initialized and server.config_manager.zig_exe != null) {
-            switch (BuildOnSaveSupport.isSupportedRuntime(server.config_manager.zig_exe.?.version)) {
-                .supported => {},
-                .invalid_linux_kernel_version => |*utsname_release| log.warn("Build-On-Save cannot run in watch mode because the Linux version '{s}' could not be parsed", .{std.mem.sliceTo(utsname_release, 0)}),
-                .unsupported_linux_kernel_version => |kernel_version| log.warn("Build-On-Save cannot run in watch mode because it is not supported by Linux '{f}' (requires at least {f})", .{ kernel_version, BuildOnSaveSupport.minimum_linux_version }),
-                .unsupported_zig_version => log.warn("Build-On-Save cannot run in watch mode because it is not supported on {t} by Zig {f} (requires at least {f})", .{ zig_builtin.os.tag, server.resolved_config.zig_runtime_version.?, BuildOnSaveSupport.minimum_zig_version }),
-                .unsupported_os => log.warn("Build-On-Save cannot run in watch mode because it is not supported on {t}", .{zig_builtin.os.tag}),
-            }
-        }
+        // Build-On-Save was removed for Zig 0.17, the setting is still accepted
+        // so existing configs keep parsing. See the note at the top of this file.
+        log.info("'enable_build_on_save' is ignored because build on save is not supported by this ZigAnalyzer build", .{});
     }
 
     if (new_force_autofix) {
@@ -1191,12 +1069,6 @@ fn saveDocumentHandler(server: *Server, arena: std.mem.Allocator, notification: 
             },
         );
         server.allocator.free(json_message);
-    }
-
-    if (BuildOnSaveSupport.isSupportedComptime()) {
-        for (server.workspaces.items) |*workspace| {
-            workspace.sendManualWatchUpdate();
-        }
     }
 }
 
