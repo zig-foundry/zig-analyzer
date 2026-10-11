@@ -259,6 +259,50 @@ test "asm" {
         \\    );
         \\}
     );
+    // non-arrow output operands are bare identifier tokens, make sure
+    // references, rename and highlight find them (upstream #3222)
+    try testSymbolReferences(
+        \\fn foo() void {
+        \\    var <0> = 0;
+        \\    asm ("bogus"
+        \\        : [ret] "={rax}" (<0>),
+        \\        : [val] "r" (<0>),
+        \\    );
+        \\}
+    );
+    try testReferences(&.{
+        \\pub fn main() void {
+        \\    var <loc>bar<cursor></loc> = 5;
+        \\    const refr = <loc>bar</loc> + 4;
+        \\    _ = refr;
+        \\    asm volatile (
+        \\        \\ mov $5, %rax
+        \\        : [ret] "={rax}" (<loc>bar</loc>),
+        \\    );
+        \\}
+    }, .{ .format = .asymmetric, .request_kind = .rename });
+    try testReferences(&.{
+        \\pub fn main() void {
+        \\    var <loc>bar</loc> = 5;
+        \\    const refr = <loc>bar</loc> + 4;
+        \\    _ = refr;
+        \\    asm volatile (
+        \\        \\ mov $5, %rax
+        \\        : [ret] "={rax}" (<loc>bar<cursor></loc>),
+        \\    );
+        \\}
+    }, .{ .format = .asymmetric, .request_kind = .rename });
+    try testReferences(&.{
+        \\pub fn main() void {
+        \\    var <loc>bar</loc> = 5;
+        \\    const refr = <loc>bar</loc> + 4;
+        \\    _ = refr;
+        \\    asm volatile (
+        \\        \\ mov $5, %rax
+        \\        : [ret] "={rax}" (<loc>bar<cursor></loc>),
+        \\    );
+        \\}
+    }, .{ .format = .asymmetric, .request_kind = .references });
 }
 
 test "function header" {

@@ -234,6 +234,39 @@ const Builder = struct {
                 }
                 return;
             },
+            .@"asm",
+            .asm_simple,
+            => {
+                // Input operands are expression nodes which the walker visits.
+                // Non-arrow output operands (`: [name] "constraint" (ident)`)
+                // are bare identifier tokens, not nodes, so the walker never
+                // sees them. Scan them here or renames miss asm outputs.
+                const asm_node = tree.fullAsm(node).?;
+                for (asm_node.outputs) |output_node| {
+                    const main_token = tree.nodeMainToken(output_node);
+                    // Arrow outputs (`-> type`) carry the operand as a node
+                    // which the walker visits; skip those here.
+                    if (tree.tokenTag(main_token + 4) == .arrow) continue;
+                    const name_token = main_token + 4;
+                    if (tree.tokenTag(name_token) != .identifier) continue;
+                    const name = offsets.identifierTokenToNameSlice(tree, name_token);
+                    if (std.mem.eql(u8, name, "_")) continue;
+                    if (!std.mem.eql(u8, name, target_symbol_name)) continue;
+
+                    var candidate = try builder.analyser.lookupSymbolGlobal(
+                        handle,
+                        name,
+                        tree.tokenStart(name_token),
+                    ) orelse continue;
+                    if (builder.resolve_aliases) {
+                        candidate = try builder.analyser.resolveVarDeclAlias(candidate) orelse candidate;
+                    }
+                    if (builder.target_symbol.eql(candidate)) {
+                        try builder.add(handle, name_token);
+                    }
+                }
+                return;
+            },
             .enum_literal => {
                 if (builder.local_only_decl) return;
                 const name_token = tree.nodeMainToken(node);
@@ -377,39 +410,11 @@ fn gatherWorkspaceReferenceCandidates(
     /// The file which contains the symbol that is being searched for.
     target_handle: *DocumentStore.Handle,
 ) Analyser.Error!Uri.ArrayHashMap(void) {
-    if (DocumentStore.supports_build_system) no_build_file: {
-        const resolved = switch (try root_handle.getAssociatedBuildFile(store)) {
-            .unresolved => return .empty, // this should await instead
-            .none => break :no_build_file,
-            .resolved => |resolved| resolved,
-        };
-
-        const root_module_root_uri: Uri = try .fromPath(arena, resolved.root_source_file);
-
-        var found_uris: Uri.ArrayHashMap(void) = .empty;
-        try found_uris.put(arena, root_module_root_uri, {});
-
-        if (!root_handle.uri.eql(target_handle.uri)) {
-            switch (try target_handle.getAssociatedBuildFile(store)) {
-                .unresolved, .none => {},
-                .resolved => |resolved2| {
-                    const target_module_root_uri: Uri = try .fromPath(arena, resolved2.root_source_file);
-                    // also search through the module in which the symbol has been defined
-                    try found_uris.put(arena, target_module_root_uri, {});
-                },
-            }
-        }
-
-        var i: usize = 0;
-        while (i < found_uris.count()) : (i += 1) {
-            const uri = found_uris.keys()[i];
-            const handle = try store.getOrLoadHandle(uri) orelse continue;
-
-            try found_uris.ensureUnusedCapacity(arena, handle.file_imports.len);
-            for (handle.file_imports) |import_uri| found_uris.putAssumeCapacity(import_uri, {});
-        }
-        return found_uris;
-    }
+    // The build-runner based candidate search was removed for Zig 0.17, see
+    // `DocumentStore.supports_build_system`. Search every loaded file through
+    // the file-import graph instead. Named modules from `build.zig` are not
+    // covered until a new configuration protocol lands.
+    _ = root_handle;
 
     var per_file_dependants: Uri.ArrayHashMap(std.ArrayList(Uri)) = .empty;
 
