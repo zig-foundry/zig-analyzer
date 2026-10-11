@@ -590,6 +590,13 @@ test "matching control flow - nested loop with outer label" {
     );
 }
 
+test "branching type members" {
+    try testSimpleReferences(
+        \\const Foo = if (true) struct { const <loc>a</loc> = 0; } else struct { const <loc>a</loc> = 0; };
+        \\pub fn main() void { Foo.<loc>a<cursor></loc>; }
+    );
+}
+
 test "matching control flow - nested loop with inner label" {
     try testSimpleReferences(
         \\const foo = for (0..1) |i| {

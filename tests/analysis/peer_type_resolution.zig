@@ -170,6 +170,22 @@ pub fn main() !void {
     _ = noreturn_1;
     //  ^^^^^^^^^^ (S)()
 
+    const for_else_0 = for ([_]S{s}) |v| {
+        if (runtime_bool) break v.int;
+    } else {
+        return;
+    };
+    _ = for_else_0;
+    //  ^^^^^^^^^^ (i64)()
+
+    const while_else_0 = while (runtime_bool) {
+        break s;
+    } else {
+        return;
+    };
+    _ = while_else_0;
+    //  ^^^^^^^^^^^^ (S)()
+
     // Use @compileLog to verify the expected type with the compiler:
     // @compileLog(error_union_0);
 

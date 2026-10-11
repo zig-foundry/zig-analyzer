@@ -495,6 +495,19 @@ test "imports with gap" {
     });
 }
 
+test "anon struct param keeps body fold" {
+    try testFoldingRange(
+        \\fn baz(a: struct {
+        \\    b: i32,
+        \\}) void {
+        \\    _ = a.b;
+        \\}
+    , &.{
+        .{ .startLine = 0, .startCharacter = 18, .endLine = 1, .endCharacter = 11 },
+        .{ .startLine = 2, .startCharacter = 9, .endLine = 3, .endCharacter = 12 },
+    });
+}
+
 fn testFoldingRange(source: []const u8, expect: []const types.FoldingRange) !void {
     var ctx: Context = try .init();
     defer ctx.deinit();

@@ -270,6 +270,17 @@ fn generateFoldingRanges(allocator: std.mem.Allocator, tree: *const Ast, encodin
                 const param_has_comma = last_param_tok + 1 < tree.tokens.len and tree.tokenTag(last_param_tok + 1) == .comma;
                 const list_end_tok = last_param_tok + @intFromBool(param_has_comma);
 
+                // An inline `struct/enum/union` as last param closes with `}` on the
+                // `) void {` line. That param fold ends where the body fold starts,
+                // and line-only clients drop the body fold. Skip it; the inner
+                // container keeps its own fold.
+                if (list_end_tok + 1 < tree.tokens.len and
+                    tree.tokenTag(list_end_tok) == .r_brace and
+                    tree.tokensOnSameLine(list_end_tok, list_end_tok + 1))
+                {
+                    continue;
+                }
+
                 try builder.add(null, list_start_tok, list_end_tok, .exclusive, .inclusive);
             },
 

@@ -182,8 +182,19 @@ const Builder = struct {
                 const lhs = try builder.analyser.resolveTypeOfNode(.of(lhs_node, handle)) orelse return;
                 const deref_lhs = try builder.analyser.resolveDerefType(lhs) orelse lhs;
 
-                const candidate = try deref_lhs.lookupSymbol(builder.analyser, name) orelse return;
-                break :candidate .{ candidate, field_token };
+                // Branching types (if/switch `either`): check every variant.
+                // A first-only lookup misses members that live on another branch.
+                const variants = try deref_lhs.getAllTypesWithHandles(builder.analyser);
+                for (variants) |variant| {
+                    var candidate = try variant.lookupSymbol(builder.analyser, name) orelse continue;
+                    if (builder.resolve_aliases) {
+                        candidate = try builder.analyser.resolveVarDeclAlias(candidate) orelse candidate;
+                    }
+                    if (builder.target_symbol.eql(candidate)) {
+                        break :candidate .{ candidate, field_token };
+                    }
+                }
+                return;
             },
             .struct_init_one,
             .struct_init_one_comma,
@@ -298,8 +309,12 @@ const Builder = struct {
                 const lhs = try builder.analyser.resolveTypeOfNode(.of(lhs_node, handle)) orelse return;
                 const deref_lhs = try builder.analyser.resolveDerefType(lhs) orelse lhs;
 
-                const candidate = try deref_lhs.lookupSymbol(builder.analyser, field_name) orelse return;
-                break :candidate .{ candidate, alias_name_token };
+                const variants = try deref_lhs.getAllTypesWithHandles(builder.analyser);
+                for (variants) |variant| {
+                    const candidate = try variant.lookupSymbol(builder.analyser, field_name) orelse continue;
+                    break :candidate .{ candidate, alias_name_token };
+                }
+                return;
             },
             else => return,
         };
@@ -653,10 +668,13 @@ const CallBuilder = struct {
                         const deref_lhs = try builder.analyser.resolveDerefType(lhs) orelse lhs;
 
                         const symbol = offsets.tokenToSlice(tree, field_name);
-                        const child = (try deref_lhs.lookupSymbol(builder.analyser, symbol)) orelse return;
-
-                        if (builder.target_decl.eql(child)) {
-                            try builder.add(handle, node);
+                        const variants = try deref_lhs.getAllTypesWithHandles(builder.analyser);
+                        for (variants) |variant| {
+                            const child = try variant.lookupSymbol(builder.analyser, symbol) orelse continue;
+                            if (builder.target_decl.eql(child)) {
+                                try builder.add(handle, node);
+                                break;
+                            }
                         }
                     },
                     else => {},
@@ -756,7 +774,10 @@ fn referencesHandler(
         else => true,
     };
 
-    // TODO: Make this work with branching types
+    // Branching types (if/switch `either`) expose one decl per branch.
+    // `getSymbolFieldAccesses` already returns all of them; run one
+    // `symbolReferences` pass per decl and merge, or renames only touch
+    // the first branch.
     const locations = locs: {
         if (pos_context == .keyword and request != .rename) {
             break :locs try controlFlowReferences(
@@ -770,17 +791,43 @@ fn referencesHandler(
         const name_loc = offsets.identifierLocFromIndex(&handle.tree, source_index) orelse return null;
         const name = offsets.locToSlice(handle.tree.source, name_loc);
 
+        if (pos_context == .field_access) {
+            const loc = pos_context.field_access;
+            const held_loc = offsets.locMerge(loc, name_loc);
+            const decls = try analyser.getSymbolFieldAccesses(arena, handle, source_index, held_loc, name) orelse return null;
+            if (decls.len == 0) return null;
+            var merged: std.ArrayList(types.Location) = .empty;
+            for (decls) |d| {
+                if (d.decl == .label) continue;
+                const part = try symbolReferences(
+                    &analyser,
+                    request,
+                    d,
+                    server.offset_encoding,
+                    include_decl,
+                    handle,
+                );
+                for (part.items) |new_loc| {
+                    var dup = false;
+                    for (merged.items) |old_loc| {
+                        if (std.mem.eql(u8, old_loc.uri, new_loc.uri) and
+                            old_loc.range.start.line == new_loc.range.start.line and
+                            old_loc.range.start.character == new_loc.range.start.character and
+                            old_loc.range.end.line == new_loc.range.end.line and
+                            old_loc.range.end.character == new_loc.range.end.character)
+                        {
+                            dup = true;
+                            break;
+                        }
+                    }
+                    if (!dup) try merged.append(arena, new_loc);
+                }
+            }
+            break :locs merged;
+        }
+
         const target_decl = switch (pos_context) {
             .var_access, .test_doctest_name => try analyser.lookupSymbolGlobal(handle, name, source_index),
-            .field_access => |loc| z: {
-                const held_loc = offsets.locMerge(loc, name_loc);
-                const a = try analyser.getSymbolFieldAccesses(arena, handle, source_index, held_loc, name);
-                if (a) |b| {
-                    if (b.len != 0) break :z b[0];
-                }
-
-                break :z null;
-            },
             .label_access, .label_decl => try Analyser.lookupLabel(handle, name, source_index),
             .enum_literal => blk: {
                 const decl, _ = try analyser.getSymbolEnumLiteral(handle, source_index, name) orelse break :blk null;

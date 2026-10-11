@@ -134,13 +134,13 @@ Upstream state pulled 2026-10-11 via `gh issue list --repo zigtools/zls`
 | diagnostic `source` mismatch (`zig_analyzer` vs `zig-analyzer`) | done |
 | build config loading stubbed out (was `DocumentStore.zig:1165`, `Server.zig:28`; runner removed, `@compileError` markers deleted, `build_files` map + associated config + no-op invalidate kept) | done |
 | rename misses `asm` operands (upstream #3222; fixed: `referenceNode` scans non-arrow output operand tokens) | done |
-| folding breaks on anon struct param (upstream #3254) | not started |
-| references miss branching-type members (upstream #3262) | not started |
+| folding breaks on anon struct param (upstream #3254; fixed: skip param-list fold when inline container closes on `)` line) | done |
+| references miss branching-type members (upstream #3262; fixed: expand `either` variants in reference scan + multi-seed field-access targets) | done |
 | no completion for optional / ptr struct params (upstream #3259) | not started |
 | wrong diagnostic when module named `build.zig` (upstream #3249) | not started |
-| branching type keeps `noreturn` (upstream #3210) | not started |
+| branching type keeps `noreturn` (upstream #3210; fixed with #3272 via `Type.fromEither` peer merge) | done |
 | missing docs on root-module / error hover (upstream #3248, #3247) | not started |
-| `for` + `break` typed as `noreturn` (upstream #3272) | not started |
+| `for` + `break` typed as `noreturn` (upstream #3272; fixed: collect `else` + all `break` operands into `Type.fromEither`) | done |
 | Nix `FileNotFound` with BSP-patched Zig (upstream #3271) | not started |
 | bad `.Function` type on instantiated-namespace method call (upstream #3257) | not started |
 | dot completion drops generic call binding (upstream #3205) | not started |
@@ -232,3 +232,64 @@ consumer protocol (upstream #3208). These need it:
 | release ZLS 0.17.0 (upstream #3267) | tracked |
 | 0.17 release question (upstream #3274) | tracked |
 | Zig AST parser limits (upstream #2346) | tracked |
+
+## zig-analyzer 0.17.0 release
+
+Scope: cut a stable tag on Zig 0.17.0.
+
+Rule: `build.zig.zon` moves from `0.17.0-dev` to `0.17.0`.
+Builds run with Zig 0.17.0 on all targets.
+
+`supports_build_system = false` ships in this release.
+Release notes list the blocked IDs from the section above.
+
+### Release blockers (bugs)
+
+| Bug | Status |
+| :--- | :--- |
+| wrong diagnostic when module named `build.zig` (upstream #3249) | planned |
+| goto-declaration fails on aliasing (upstream #2054) | planned |
+| cross-file refs on file structs fail (upstream #2612) | planned |
+| methods unrecognized in own file (upstream #2403) | planned |
+| MemoryPool methods lack hover/goto (upstream #2464) | planned |
+| check diagnostics miss full type span (upstream #2060) | planned |
+| no completion for optional / ptr struct params (upstream #3259) | planned |
+| no field completion for param structs (upstream #3196) | planned |
+| no enum branch-name autocomplete on switch (upstream #3202) | planned |
+| no completions after declarations on import (upstream #2283) | planned |
+| completions die on recoverable error (upstream #1112) | planned |
+| Nix `FileNotFound` with BSP-patched Zig (upstream #3271) | planned |
+| no UTF-8 BOM handling (upstream #225) | planned |
+| XDG_CONFIG_HOME ignored on macOS (upstream #3273) | planned |
+
+### Release blockers (crash + performance)
+
+| Item | Status |
+| :--- | :--- |
+| pending file-io crash on windows (upstream #3193) | planned |
+| coc.nvim connection drop (upstream #2068) | planned |
+| stall + leak on newline/comment replace (upstream #788) | planned |
+| 20s completion on `c` imports (upstream #3251) | planned |
+| redundant work on large files (upstream #2237) | planned |
+
+### Release chores
+
+| Chore | Status |
+| :--- | :--- |
+| bump `.version` from `0.17.0-dev` to `0.17.0` in `build.zig.zon` | planned |
+| fix README warning block (says Zig master, code pins 0.17.0) | planned |
+| write release notes with `supports_build_system = false` + blocked IDs | planned |
+| close stale runner-era reports as wontfix (#3176, #2573, #2572, #2340, #2276, #2196, #2129) | planned |
+| verify `schema.json` and `install.sh` modes (`--dev`, `--local`, `--github`, `--uninstall`, `--prefix`, `--optimize`) | planned |
+| verify 5 release archives (linux x2, macos x2, windows x1) + checksums | planned |
+| editor smoke pass: helix, nvim, vscode, coc.nvim connect check | planned |
+| run repro files (`issue_3222`, `issue_3254`, `issue_3272`, `issue_3262_branching_refs`) | planned |
+
+### Deferred to 0.17.1
+
+| Item | Status |
+| :--- | :--- |
+| all feature requests in the table above (none needed for parity) | deferred |
+| all enhancements in the table above (polish work) | deferred |
+| blocked-on-protocol work (needs Zig configure/make split) | deferred |
+| perf benches (#1522, trigram bench) unless #3251 reproduces badly | deferred |
